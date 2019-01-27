@@ -1,0 +1,10 @@
+Test.
+
+Usage:
+  test.py raster <fromLAS> <toLAS> <rasterSize>
+  test.py select
+  test.py piv <windowSize> <stepSize>
+
+Options:
+  -h --help     Show this screen.
+  -v --version  Show version.
