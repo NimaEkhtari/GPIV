@@ -14,8 +14,10 @@ Options:
   '''
 from docopt import docopt
 import raster_option
+import select_option3
 import os
 import sys
+import rasterio
 
 def is_number(n):
   try:
@@ -61,7 +63,10 @@ if __name__ == '__main__':
     # check to.tif exists and is geotiff
 
     # call select
-    # select()
+    fromRaster = rasterio.open('from.tif')
+    fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
+    area = select_option3.polygon_drawer('test')
+    area.run(fromHeight)
 
     print(arguments)
 
