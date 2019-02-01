@@ -1,99 +1,77 @@
-import click
-import pdal
-import json
-import math
-import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
-from osgeo import gdal
+'''
+gpiv
 
-# workaround for click not returning help if no arguments or options passed
-# https://stackoverflow.com/questions/50442401/how-to-set-the-default-option-as-h-for-python-click
-class DefaultHelp(click.Command):
-    def __init__(self, *args, **kwargs):
-        context_settings = kwargs.setdefault('context_settings', {})
-        if 'help_option_names' not in context_settings:
-            context_settings['help_option_names'] = ['-h', '--help']
-        self.help_flag = context_settings['help_option_names'][0]
-        super(DefaultHelp, self).__init__(*args, **kwargs)
+Usage:
+  gpiv.py raster <fromLAS> <toLAS> <rasterSize>
+  gpiv.py select 
+  gpiv.py piv <windowSize> <stepSize> [--propagate]
+  gpiv.py show
 
-    def parse_args(self, ctx, args):
-        if not args:
-            args = [self.help_flag]
-        return super(DefaultHelp, self).parse_args(ctx, args)
+Options:
+  -h --help       Show this screen.
+  -v --version    Show version.
+  -p --propagate  Propagate raster height error.
+  '''
+from docopt import docopt
+import raster_option
+import os
+import sys
 
-
-@click.command(cls=DefaultHelp)
-# @click.option('-r', '--raster',
-#     type=(click.Path(exists=True, dir_okay=False), click.Path(exists=True, dir_okay=False), float), 
-#     help='<from las file> <to las file> <raster size>')
-@click.argument('fromLAS', type=click.Path(exists=True, dir_okay=False))
-@click.argument('toLAS', type=click.Path(exists=True, dir_okay=False))
-@click.argument('rasterSize', type=float)
-def raster(fromLAS, toLAS, rasterSize):       
-
-    # r = raster[2]*math.sqrt(0.5)
-
-    # fromRaster = {
-    #     "pipeline": [
-    #         raster[0],
-    #         {
-    #             "resolution": raster[2],
-    #             "radius": r,
-    #             "filename": "from.tif"
-    #         }
-    #     ]
-    # }
-    # fromRaster = json.dumps(fromRaster)
-
-    # toRaster = {
-    #     "pipeline": [
-    #         raster[1],
-    #         {
-    #             "resolution": raster[2],
-    #             "radius": r,
-    #             "filename": "to.tif"
-    #         }
-    #     ]
-    # }
-    # toRaster = json.dumps(toRaster)
-    
-    # pipeline = pdal.Pipeline(fromRaster)
-    # pipeline.validate()
-    # pipeline.execute()
-
-    # pipeline = pdal.Pipeline(toRaster)
-    # pipeline.validate()
-    # pipeline.execute()
-   
-    import rasterio
-    import rasterio.plot
-    import matplotlib.pyplot as plt
-
-    image1 = plt.subplot(121)
-    image2 = plt.subplot(122)
-    
-    fromRaster = rasterio.open('from.tif')
-    rasterio.plot.show((fromRaster, 1), ax=image1, title='From')
-    toRaster = rasterio.open('to.tif')
-    rasterio.plot.show((toRaster, 1), ax=image2, title='To')
-    plt.show()
-
-
-    # image1 = plt.subplot(121)
-    # image2 = plt.subplot(122)
-
-    # #read the image files (png files preferred)
-    # img_source1 = mpimg.imread('img1.jpg')
-    # img_source2 = mpimg.imread('img2.jpg')
-    # #put the images into the window
-    # _ = image1.imshow(img_source1)
-    # _ = image2.imshow(img_source2)
-
-    # #hide axis and show window with images
-    # # image1.axis("off")
-    # # image2.axis("off")
-    # plt.show()
-
+def is_number(n):
+  try:
+    x = float(n)
+    if x <= 0:
+      return False
+  except ValueError:
+      return False
+  return True
 
 if __name__ == '__main__':
-    raster()
+
+  arguments = docopt(__doc__)
+
+  if arguments['raster']: 
+
+    # check fromFile is valid
+    if not os.path.isfile(arguments['<fromLAS>']):
+      print('Invalid fromLAS file.')
+      sys.exit()
+
+    # check toFile is valid
+    if not os.path.isfile(arguments['<toLAS>']):
+      print('Invalid toLAS file.')
+      sys.exit()
+
+    # check rasterSize is >0
+    if not is_number(arguments['<rasterSize>']):
+      print('Raster size must be a positive number')
+      sys.exit()
+  
+    # raster LAS files
+    # raster_option.create_rasters(arguments['<fromLAS>'], arguments['<toLAS>'], arguments['<rasterSize>'])
+
+    # display height and error rasters
+    raster_option.show_rasters()
+
+  if arguments['select']:
+    # will want to eventually allow users to optionally input their own geotiffs
+
+    # check from.tif exists and is geotiff
+    
+    # check to.tif exists and is geotiff
+
+    # call select
+    # select()
+
+    print(arguments)
+
+  if arguments['piv']:
+
+    # check from.tif exists and is geotiff
+    
+    # check to.tif exists and is geotiff
+
+    # call piv
+    # piv()
+
+    print(arguments)
