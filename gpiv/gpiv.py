@@ -18,6 +18,7 @@ import select_option3
 import os
 import sys
 import rasterio
+import numpy as np
 
 def is_number(n):
   try:
@@ -65,8 +66,12 @@ if __name__ == '__main__':
     # call select
     fromRaster = rasterio.open('from.tif')
     fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
+    fromHeight = (fromHeight - fromHeight.min()) / (fromHeight.max() - fromHeight.min()) # normalize to [0,1]
+    fromHeight = fromHeight * 255
+    img = fromHeight.astype(np.uint8)
+    img = np.stack((img,)*3, axis=-1)
     area = select_option3.polygon_drawer('test')
-    area.run(fromHeight)
+    area.run(img)
 
     print(arguments)
 
