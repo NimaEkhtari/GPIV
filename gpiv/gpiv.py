@@ -14,7 +14,7 @@ Options:
   '''
 from docopt import docopt
 import raster_option
-import select_option3
+import select_option6
 import os
 import sys
 import rasterio
@@ -64,16 +64,27 @@ if __name__ == '__main__':
     # check to.tif exists and is geotiff
 
     # call select
-    fromRaster = rasterio.open('from.tif')
-    fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
-    fromHeight = (fromHeight - fromHeight.min()) / (fromHeight.max() - fromHeight.min()) # normalize to [0,1]
-    fromHeight = fromHeight * 255
-    img = fromHeight.astype(np.uint8)
-    img = np.stack((img,)*3, axis=-1)
-    area = select_option3.polygon_drawer('test')
-    area.run(img)
+    # fromRaster = rasterio.open('from.tif')
+    # fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
+    # fromHeight = (fromHeight - fromHeight.min()) / (fromHeight.max() - fromHeight.min()) # normalize to [0,1]
+    # fromHeight = fromHeight * 255
+    # fromImg = fromHeight.astype(np.uint8)
+    # fromImg = np.stack((fromImg,)*3, axis=-1)
 
-    print(arguments)
+    # toRaster = rasterio.open('to.tif')
+    # toHeight =  toRaster.read(3, masked=True) # read band to numpy array
+    # toHeight = (toHeight - toHeight.min()) / (toHeight.max() - toHeight.min()) # normalize to [0,1]
+    # toHeight = toHeight * 255
+    # toImg = toHeight.astype(np.uint8)
+    # toImg = np.stack((toImg,)*3, axis=-1)
+
+    # area = select_option4.polygon_drawer('From', 'To')
+    # area.run(fromImg, toImg)
+
+    # print(arguments)
+
+    pivArea = select_option6.create_polygon()
+    pivArea.run()
 
   if arguments['piv']:
 
