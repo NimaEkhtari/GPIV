@@ -14,7 +14,7 @@ Options:
   '''
 from docopt import docopt
 import raster_option
-import select_option6
+import select_option7
 import os
 import sys
 import rasterio
@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     # print(arguments)
 
-    pivArea = select_option6.create_polygon()
+    pivArea = select_option7.create_polygon()
     pivArea.run()
 
   if arguments['piv']:

@@ -3,6 +3,7 @@ from matplotlib.patches import Polygon
 import rasterio
 import rasterio.plot
 import numpy as np
+import json
 
 
 class create_polygon:
@@ -15,7 +16,7 @@ class create_polygon:
         self.yData = list()
 
     def __onButtonClick(self, event):        
-        # guard against click locations outside the axes
+        # ignore mouse clicks outside the axes
         if event.inaxes is None: 
             return
         
@@ -26,37 +27,37 @@ class create_polygon:
             self.yScalar.append(event.y)
             self.xData.append(event.xdata)
             self.yData.append(event.ydata)
+
             # draw line
             self.lineFrom.set_data(self.xData, self.yData)
             self.lineFrom.figure.canvas.draw()
             self.lineTo.set_data(self.xData, self.yData)
             self.lineTo.figure.canvas.draw()
+            
+            # print to command line
+            print('Point appended to polygon: x=%d, y=%d, xdata=%f, ydata=%f' %
+                (event.x, event.y, event.xdata, event.ydata))
 
         # check for middle or right click(draw pologyon)
         if event.button>1:
-            # draw polygon
+            # draw polygon on both subplots
             xyData = np.column_stack((self.xData, self.yData))            
             polyFrom = Polygon(xyData, facecolor='0.9', edgecolor='1.0')
             polyTo = Polygon(xyData, facecolor='0.9', edgecolor='1.0')
             self.axFrom.add_patch(polyFrom)
-            self.axTo.add_patch(polyTo)
+            self.axTo.add_patch(polyTo)            
             self.fig.canvas.draw()
-
             
-        
+            # save polygon
+            jsonOut = xyData.tolist()
+            json.dump(jsonOut, open("polygon.json", "w"))
+            print('polygon vertices saved to file polygon.json')
 
+            # exit
+            self.fig.canvas.mpl_disconnect(self.cid1)
 
-
-
-        
-        print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-          ('double' if event.dblclick else 'single', event.button,
-           event.x, event.y, event.xdata, event.ydata))
 
     def __onKeyPress(self, event):
-
-        # # check for enter button press (draw polygon)
-        # if event.key=='enter':
 
         # # check for escape button press (clear any line or polygon)
         # if event.key=='escape':
@@ -119,7 +120,7 @@ class create_polygon:
         self.lineFrom, = self.axFrom.plot([0][0], color='white', lw=1)
         self.lineTo, = self.axTo.plot([0][0], color='white', lw=1)
 
-        cid1 = self.fig.canvas.mpl_connect('button_press_event', self.__onButtonClick)
+        self.cid1 = self.fig.canvas.mpl_connect('button_press_event', self.__onButtonClick)
         cid2 = self.fig.canvas.mpl_connect('key_press_event', self.__onKeyPress)
 
         plt.show()
