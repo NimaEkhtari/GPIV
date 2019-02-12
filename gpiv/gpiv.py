@@ -83,8 +83,7 @@ if __name__ == '__main__':
 
     # print(arguments)
 
-    pivArea = select_option7.create_polygon()
-    pivArea.run()
+    select_option7.create_polygon()
 
   if arguments['piv']:
 
