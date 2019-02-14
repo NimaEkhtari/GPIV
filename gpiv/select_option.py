@@ -1,100 +1,181 @@
-'''
-polygon_drawer is based on Moritz Lürig's adaptation
-(https://github.com/mluerig/iso_track/blob/master/iso_track_modules.py) of Dan
-Mašek's answer to this SO question
-https://stackoverflow.com/questions/37099262/drawing-filled-polygon-using-mouse-events-in-open-cv-using-python
-'''
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import rasterio
+import rasterio.plot
 import numpy as np
-import cv2
-import math
-import copy
-import os
+import json
 
 
-class polygon_drawer(object):
-    
-    # initiate
-    def __init__(self, video_name, save_path):
-        self.window_name = video_name # Name for our window
-        self.video_name = video_name
-        self.save_path = save_path # Name for our window
-        self.done = False # Flag signalling we're done
-        self.current = (0, 0) # Current position, so we can draw the line-in-progress
-        self.points = [] # List of points defining our polygon
-        
-        self.FINAL_LINE_COLOR = (0, 255, 0)
-        self.FILL_COLOR = (255,255,255)
-        self.WORKING_LINE_COLOR = (255, 0, 0)
+class create_polygon:
 
-    # mouse action
-    def on_mouse(self, event, x, y, buttons, user_param):
-        # Mouse callback that gets called for every mouse event (i.e. moving, clicking, etc.)
+    def __init__(self):
+        # some lists to hold screen and geospatial coordinates 
+        self.xScalar = list()
+        self.yScalar = list()
+        self.xData = list()
+        self.yData = list()
 
-        if self.done: # Nothing more to do
+        # get the data
+        fromRaster = rasterio.open('from.tif')
+        fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
+        fromLRBT = list(rasterio.plot.plotting_extent(fromRaster)) # LRBT = [left, right, bottom, top]
+
+        # form the figure
+        self.fig, self.ax = plt.subplots()        
+        im = self.ax.imshow(fromHeight,
+                        extent=fromLRBT,
+                        cmap='jet')
+        self.ax.set_xlim(fromLRBT[0], fromLRBT[1])
+        self.ax.set_ylim(fromLRBT[2], fromLRBT[3])
+        self.ax.set_title('Height: From')
+        self.fig.colorbar(im,
+                        orientation='vertical', 
+                        aspect=40)
+
+        # get the line ready
+        self.line, = self.ax.plot([0][0], color='white', lw=1, alpha=0.3)
+
+        # get the polygon ready
+        self.poly = patches.Polygon([[0,0],[0,0]], facecolor='0.9', edgecolor='1.0', alpha = 0.3)
+        self.ax.add_artist(self.poly)
+
+        # define mouse click and key press functions
+        self.cid1 = self.fig.canvas.mpl_connect('button_press_event', self.__onButtonClick)
+        self.cid2 = self.fig.canvas.mpl_connect('key_press_event', self.__onKeyPress)
+
+        plt.show()
+      
+
+    def __onButtonClick(self, event):        
+        # ignore mouse clicks outside the axes
+        if event.inaxes is None: 
             return
-
-        if event == cv2.EVENT_MOUSEMOVE:
-            # We want to be able to draw the line-in-progress, so update current mouse position
-            self.current = (x, y)
-        if event == cv2.EVENT_LBUTTONDOWN:
-            # Left click means adding a point at current position to the list of points
-            print("Adding point #%d with position(%d,%d)" % (len(self.points), x, y))
-            self.points.append((x, y))
-        elif event == cv2.EVENT_RBUTTONDOWN:
-            # Right click means we're done
-            print("Completing polygon with %d points." % len(self.points))
-            self.done = True
-
-    # draw lines
-    def run(self, image):
-        # Let's create our working window and set a mouse callback to handle events
-        cv2.namedWindow(self.window_name, flags=cv2.WINDOW_NORMAL)
-        cv2.imshow(self.window_name, image)
-        cv2.waitKey(1)
-        cv2.setMouseCallback(self.window_name, self.on_mouse)
         
-        temp_canvas = copy.deepcopy(image)
+        # check for left click (add line segment)
+        if event.button==1:
+            # make sure the poly patch is empty if we are tracing a new polygon
+            if not self.xScalar:
+                self.poly.set_xy([[0,0],[0,0]])
 
-        while(not self.done):
-            # This is our drawing loop, we just continuously draw new images
-            # and show them in the named window
-            if (len(self.points) > 0):
-                # Draw all the current polygon segments
-                cv2.polylines(temp_canvas, np.array([self.points]), False, self.FINAL_LINE_COLOR, 1)
-                # And  also show what the current segment would look like
-                cv2.line(temp_canvas, self.points[-1], self.current, self.WORKING_LINE_COLOR)
-            # Update the window
-            cv2.imshow(self.window_name, temp_canvas)
-            temp_canvas = copy.deepcopy(image)
-            # And wait 50ms before next iteration (this will pump window messages meanwhile)
-            if cv2.waitKey(50) == 27: # ESC hit
-                self.done = True
+            # append screen and spatial coordinates
+            self.xScalar.append(event.x)
+            self.yScalar.append(event.y)
+            self.xData.append(event.xdata)
+            self.yData.append(event.ydata)
 
-        # create final arena
-        canvas = image
-        zeros = np.zeros(canvas.shape, np.uint8)
-        red = np.zeros(canvas.shape, np.uint8)
-        red[:,:,2] = 255
-        
-        if (len(self.points) > 0):
-            cv2.fillPoly(red, np.array([self.points]), self.FINAL_LINE_COLOR)
-               
-        if (len(self.points) > 0):
-            cv2.fillPoly(zeros, np.array([self.points]), self.FILL_COLOR)
+            # draw line
+            self.line.set_data(self.xData, self.yData)
+            self.line.figure.canvas.draw()
             
-        # return for further use
-        self.mask_colour = zeros
-        self.mask_gray = cv2.cvtColor(zeros, cv2.COLOR_BGR2GRAY)
-        self.image = cv2.addWeighted(copy.deepcopy(canvas), .8, red, 0.2, 0)
-        self.points = np.array([self.points])
-        self.rect = cv2.boundingRect(self.points)
+            print('Point appended to polygon: x=%d, y=%d, xdata=%f, ydata=%f' %
+                (event.x, event.y, event.xdata, event.ydata))
 
-        # Waiting for the user to press any key and return points
-        cv2.imshow(self.window_name, self.image)
-        save_image_path = os.path.join(self.save_path, self.video_name + "_arena.png")
-        cv2.imwrite(save_image_path, self.image)    
-        
-        # show image of polygon
-        cv2.waitKey()
-        cv2.destroyWindow(self.window_name)
-        print("Arena image saved: " + save_image_path)
+        # check for middle or right click (draw polgyon)
+        if event.button>1:
+            # check for at least three vertices
+            if len(self.xData) > 2:
+
+                # insert vertices into polygon patch
+                xyData = np.column_stack((self.xData, self.yData))            
+                self.poly.set_xy(xyData)
+
+                # clear line data
+                self.xScalar = list()
+                self.yScalar = list()
+                self.xData = list()
+                self.yData = list()
+                self.line.set_data(self.xData, self.yData)  
+
+                # update figure    
+                self.fig.canvas.draw()
+                
+                # save polygon
+                jsonOut = xyData.tolist()
+                json.dump(jsonOut, open("polygon.json", "w"))
+                print('Polygon vertices saved to file polygon.json')
+
+            else: 
+                # NEED TO UPDATE: This message should only be shown if a polygon is not currently drawn
+                print('Minimum of three vertices are required.')
+
+
+    def __onKeyPress(self, event):
+        # clear line and polygon if escape button pressed
+        if event.key == 'escape':
+            if self.xScalar:
+                # clear existing line data
+                self.xScalar = list()
+                self.yScalar = list()
+                self.xData = list()
+                self.yData = list()
+                self.line.set_data(self.xData, self.yData)
+                
+                # update figure
+                self.fig.canvas.draw()
+
+                print('Polygon vertices cleared.')
+
+
+
+    # def run(self):
+    
+        # # get the data
+        # fromRaster = rasterio.open('from.tif')
+        # fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
+        # fromStd = fromRaster.read(6, masked=True)
+
+        # toRaster = rasterio.open('to.tif')
+        # toHeight = toRaster.read(3, masked=True)
+        # toStd = toRaster.read(6, masked=True) 
+            
+        # # Determine common bounds for 'to' and 'from' raster spatial extents and
+        # # values so that differences in extents and values are apparent when plotted.
+        # # 1. Determine bounding box encompassing both the 'from' and 'to' rasters
+        # fromLRBT = list(rasterio.plot.plotting_extent(fromRaster)) # LRBT = [left, right, bottom, top]
+        # toLRBT = list(rasterio.plot.plotting_extent(toRaster))
+        # LRBT = list()
+        # LRBT.append(min(fromLRBT[0], toLRBT[0]))
+        # LRBT.append(max(fromLRBT[1], toLRBT[1]))
+        # LRBT.append(min(fromLRBT[2], toLRBT[2]))
+        # LRBT.append(max(fromLRBT[3], toLRBT[3]))
+        # # 2. Get maximum and minimum array values for both the 'from' and 'to' rasters. Using percentiles to avoid outliers.
+        # minHeight = min(np.percentile(fromHeight.compressed(), 1), np.percentile(toHeight.compressed(), 1))
+        # maxHeight = max(np.percentile(fromHeight.compressed(), 99), np.percentile(toHeight.compressed(), 99))
+        # minStd = min(np.percentile(fromStd.compressed(), 1), np.percentile(toStd.compressed(), 1))
+        # maxStd = max(np.percentile(fromStd.compressed(), 99), np.percentile(toStd.compressed(), 99))
+
+        # # plot height rasters
+        # self.fig, (self.axFrom, self.axTo) = plt.subplots(1, 2, figsize=(16,9))   
+
+        # im = self.axFrom.imshow(fromHeight,
+        #                 cmap='jet',
+        #                 extent=fromLRBT,
+        #                 vmin=minHeight,
+        #                 vmax=maxHeight)
+        # self.axFrom.set_xlim(LRBT[0], LRBT[1])
+        # self.axFrom.set_ylim(LRBT[2], LRBT[3])
+        # self.axFrom.set_title('Height: From')
+
+        # im = self.axTo.imshow(toHeight,
+        #                 cmap='jet',
+        #                 extent=toLRBT,
+        #                 vmin=minHeight,
+        #                 vmax=maxHeight)   
+        # self.axTo.set_xlim(LRBT[0], LRBT[1])
+        # self.axTo.set_ylim(LRBT[2], LRBT[3])
+        # self.axTo.set_title('Height: To')
+
+        # self.fig.colorbar(im, 
+        #         ax=[self.axFrom, self.axTo], 
+        #         orientation='horizontal', 
+        #         aspect=40)
+
+        # self.lineFrom, = self.axFrom.plot([0][0], color='white', lw=1)
+        # self.lineTo, = self.axTo.plot([0][0], color='white', lw=1)
+
+        # self.cid1 = self.fig.canvas.mpl_connect('button_press_event', self.__onButtonClick)
+        # cid2 = self.fig.canvas.mpl_connect('key_press_event', self.__onKeyPress)
+
+        # plt.show()
+
+
