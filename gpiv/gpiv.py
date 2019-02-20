@@ -3,7 +3,7 @@ gpiv
 
 Usage:
   gpiv.py raster <fromLAS> <toLAS> <rasterSize>
-  gpiv.py select 
+  gpiv.py polygon 
   gpiv.py piv <windowSize> <stepSize> [--propagate]
   gpiv.py show
 
@@ -14,7 +14,8 @@ Options:
   '''
 from docopt import docopt
 import raster_option
-import select_option7
+import polygon_option
+import piv_option
 import os
 import sys
 import rasterio
@@ -56,34 +57,15 @@ if __name__ == '__main__':
     # display height and error rasters
     raster_option.show_rasters()
 
-  if arguments['select']:
-    # will want to eventually allow users to optionally input their own geotiffs
+  if arguments['polygon']:
+    # will want to eventually allow users to optionally input paths to their own geotiffs
 
     # check from.tif exists and is geotiff
     
     # check to.tif exists and is geotiff
 
     # call select
-    # fromRaster = rasterio.open('from.tif')
-    # fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
-    # fromHeight = (fromHeight - fromHeight.min()) / (fromHeight.max() - fromHeight.min()) # normalize to [0,1]
-    # fromHeight = fromHeight * 255
-    # fromImg = fromHeight.astype(np.uint8)
-    # fromImg = np.stack((fromImg,)*3, axis=-1)
-
-    # toRaster = rasterio.open('to.tif')
-    # toHeight =  toRaster.read(3, masked=True) # read band to numpy array
-    # toHeight = (toHeight - toHeight.min()) / (toHeight.max() - toHeight.min()) # normalize to [0,1]
-    # toHeight = toHeight * 255
-    # toImg = toHeight.astype(np.uint8)
-    # toImg = np.stack((toImg,)*3, axis=-1)
-
-    # area = select_option4.polygon_drawer('From', 'To')
-    # area.run(fromImg, toImg)
-
-    # print(arguments)
-
-    select_option7.create_polygon()
+    polygon_option.create_polygon()
 
   if arguments['piv']:
 
@@ -92,6 +74,6 @@ if __name__ == '__main__':
     # check to.tif exists and is geotiff
 
     # call piv
-    # piv()
+    piv_option.piv()
 
-    print(arguments)
+    # print(arguments)

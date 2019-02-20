@@ -4,6 +4,7 @@ import rasterio
 import rasterio.plot
 import numpy as np
 import json
+import os
 
 
 class create_polygon:
@@ -15,12 +16,12 @@ class create_polygon:
         self.xData = list()
         self.yData = list()
 
-        # get the data
+        # get background raster data
         fromRaster = rasterio.open('from.tif')
         fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
         fromLRBT = list(rasterio.plot.plotting_extent(fromRaster)) # LRBT = [left, right, bottom, top]
 
-        # form the figure
+        # set up the figure
         self.fig, self.ax = plt.subplots()        
         im = self.ax.imshow(fromHeight,
                         extent=fromLRBT,
@@ -32,11 +33,19 @@ class create_polygon:
                         orientation='vertical', 
                         aspect=40)
 
-        # get the line ready
+        # add a line to the figure with dummy data
         self.line, = self.ax.plot([0][0], color='white', lw=1, alpha=0.3)
 
-        # get the polygon ready
-        self.poly = patches.Polygon([[0,0],[0,0]], facecolor='0.9', edgecolor='1.0', alpha = 0.3)
+        # import existing polygon data or create dummy data
+        if os.path.isfile('polygon.json'):
+            jsonIn = json.load(open("polygon.json", "r"))
+            polyData = np.asarray(jsonIn)
+            print('Existing polygon loaded.')
+        else:
+            polyData = [[0,0],[0,0]]
+        
+        # add the polygon to the figure
+        self.poly = patches.Polygon(polyData, facecolor='0.9', edgecolor='1.0', alpha = 0.3)        
         self.ax.add_artist(self.poly)
 
         # define mouse click and key press functions
@@ -95,8 +104,9 @@ class create_polygon:
                 print('Polygon vertices saved to file polygon.json')
 
             else: 
-                # NEED TO UPDATE: This message should only be shown if a polygon is not currently drawn
-                print('Minimum of three vertices are required.')
+                polyData = self.poly.get_xy()
+                if len(polyData) < 4: # a valid polygon does not exist
+                    print('Minimum of three vertices are required.')
 
 
     def __onKeyPress(self, event):
@@ -114,68 +124,3 @@ class create_polygon:
                 self.fig.canvas.draw()
 
                 print('Polygon vertices cleared.')
-
-
-
-    # def run(self):
-    
-        # # get the data
-        # fromRaster = rasterio.open('from.tif')
-        # fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
-        # fromStd = fromRaster.read(6, masked=True)
-
-        # toRaster = rasterio.open('to.tif')
-        # toHeight = toRaster.read(3, masked=True)
-        # toStd = toRaster.read(6, masked=True) 
-            
-        # # Determine common bounds for 'to' and 'from' raster spatial extents and
-        # # values so that differences in extents and values are apparent when plotted.
-        # # 1. Determine bounding box encompassing both the 'from' and 'to' rasters
-        # fromLRBT = list(rasterio.plot.plotting_extent(fromRaster)) # LRBT = [left, right, bottom, top]
-        # toLRBT = list(rasterio.plot.plotting_extent(toRaster))
-        # LRBT = list()
-        # LRBT.append(min(fromLRBT[0], toLRBT[0]))
-        # LRBT.append(max(fromLRBT[1], toLRBT[1]))
-        # LRBT.append(min(fromLRBT[2], toLRBT[2]))
-        # LRBT.append(max(fromLRBT[3], toLRBT[3]))
-        # # 2. Get maximum and minimum array values for both the 'from' and 'to' rasters. Using percentiles to avoid outliers.
-        # minHeight = min(np.percentile(fromHeight.compressed(), 1), np.percentile(toHeight.compressed(), 1))
-        # maxHeight = max(np.percentile(fromHeight.compressed(), 99), np.percentile(toHeight.compressed(), 99))
-        # minStd = min(np.percentile(fromStd.compressed(), 1), np.percentile(toStd.compressed(), 1))
-        # maxStd = max(np.percentile(fromStd.compressed(), 99), np.percentile(toStd.compressed(), 99))
-
-        # # plot height rasters
-        # self.fig, (self.axFrom, self.axTo) = plt.subplots(1, 2, figsize=(16,9))   
-
-        # im = self.axFrom.imshow(fromHeight,
-        #                 cmap='jet',
-        #                 extent=fromLRBT,
-        #                 vmin=minHeight,
-        #                 vmax=maxHeight)
-        # self.axFrom.set_xlim(LRBT[0], LRBT[1])
-        # self.axFrom.set_ylim(LRBT[2], LRBT[3])
-        # self.axFrom.set_title('Height: From')
-
-        # im = self.axTo.imshow(toHeight,
-        #                 cmap='jet',
-        #                 extent=toLRBT,
-        #                 vmin=minHeight,
-        #                 vmax=maxHeight)   
-        # self.axTo.set_xlim(LRBT[0], LRBT[1])
-        # self.axTo.set_ylim(LRBT[2], LRBT[3])
-        # self.axTo.set_title('Height: To')
-
-        # self.fig.colorbar(im, 
-        #         ax=[self.axFrom, self.axTo], 
-        #         orientation='horizontal', 
-        #         aspect=40)
-
-        # self.lineFrom, = self.axFrom.plot([0][0], color='white', lw=1)
-        # self.lineTo, = self.axTo.plot([0][0], color='white', lw=1)
-
-        # self.cid1 = self.fig.canvas.mpl_connect('button_press_event', self.__onButtonClick)
-        # cid2 = self.fig.canvas.mpl_connect('key_press_event', self.__onKeyPress)
-
-        # plt.show()
-
-
