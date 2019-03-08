@@ -52,10 +52,10 @@ if __name__ == '__main__':
       sys.exit()
   
     # raster LAS files
-    # raster_option.create_rasters(arguments['<fromLAS>'], arguments['<toLAS>'], arguments['<rasterSize>'])
+    raster_option.create_rasters(arguments['<fromLAS>'], arguments['<toLAS>'], arguments['<rasterSize>'])
 
     # display height and error rasters
-    raster_option.show_rasters()
+    # raster_option.show_rasters()
 
   if arguments['polygon']:
     # will want to eventually allow users to optionally input paths to their own geotiffs

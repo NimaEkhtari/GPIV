@@ -7,15 +7,22 @@ import numpy as np
 def get_arrays():    
     # read in the from and to images as numpy arrays (currently assumes multiple layers in the from and to image files)
     fromRaster = rasterio.open('from.tif')
-    # fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
+    fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
     # fromStd = fromRaster.read(6, masked=True)
+    print(fromRaster.bounds)
+    print(fromHeight.shape)
+
     toRaster = rasterio.open('to.tif')
-    # toHeight = toRaster.read(3, masked=True)
+    toHeight = toRaster.read(3, masked=True)
     # toStd = toRaster.read(6, masked=True) 
+    print(toRaster.bounds)
+    print(toHeight.shape)
 
     # create a polygon defining the extents of the geospatial overlap
     fromLRBT = list(rasterio.plot.plotting_extent(fromRaster)) # LRBT = [left, right, bottom, top]
+    print(fromLRBT)
     toLRBT = list(rasterio.plot.plotting_extent(toRaster))
+    print(toLRBT)
     extentsLRBT = list()
     extentsLRBT.append(max(fromLRBT[0], toLRBT[0]))
     extentsLRBT.append(min(fromLRBT[1], toLRBT[1]))
@@ -26,6 +33,7 @@ def get_arrays():
     bbox.append([extentsLRBT[1], extentsLRBT[2]]) # Right Bottom
     bbox.append([extentsLRBT[1], extentsLRBT[3]]) # Right Top
     bbox.append([extentsLRBT[0], extentsLRBT[3]]) # Left Top
+    print(bbox)
     bpoly = geometry.Polygon(bbox)
     
     # crop from and to images to bounding box

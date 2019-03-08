@@ -10,37 +10,61 @@ def create_rasters(fromLAS, toLAS, rasterSize):
 
     rasterRadius = float(rasterSize)*math.sqrt(0.5)
 
-    # raster 'from' points with pdal
-    fromRaster = {
-        "pipeline": [
+    # get bounding box
+    test = {
+        "pipeline":[
             fromLAS,
             {
-                "resolution": rasterSize,
-                "radius": rasterRadius,
-                "filename": "from.tif"
+                "type":"filters.stats",
+                "dimensions":"X,Y"
             }
         ]
     }
-    fromRaster = json.dumps(fromRaster)
-    pipeline = pdal.Pipeline(fromRaster)
+    test = json.dumps(test) # converts test from a dict to a string for pdal
+    pipeline = pdal.Pipeline(test)
     pipeline.validate()
-    pipeline.execute()
+    test1 = pipeline.execute()
+    print(test1)
+    test2 = pipeline.metadata
+    print(type(test2))
+    result = json.loads(test2)
+    print(type(result))
+    result1 = result.get('metadata').get('readers.las')[0].get('maxx')
+    print(result1)
+   
+    
 
-    # raster 'to' points with pdal
-    toRaster = {
-        "pipeline": [
-            toLAS,
-            {
-                "resolution": rasterSize,
-                "radius": rasterRadius,
-                "filename": "to.tif"
-            }
-        ]
-    }
-    toRaster = json.dumps(toRaster)
-    pipeline = pdal.Pipeline(toRaster)
-    pipeline.validate()
-    pipeline.execute()
+    # # raster 'from' points with pdal
+    # fromRaster = {
+    #     "pipeline": [
+    #         fromLAS,
+    #         {
+    #             "resolution": rasterSize,
+    #             "radius": rasterRadius,
+    #             "filename": "from.tif"
+    #         }
+    #     ]
+    # }
+    # fromRaster = json.dumps(fromRaster)
+    # pipeline = pdal.Pipeline(fromRaster)
+    # pipeline.validate()
+    # pipeline.execute()
+
+    # # raster 'to' points with pdal
+    # toRaster = {
+    #     "pipeline": [
+    #         toLAS,
+    #         {
+    #             "resolution": rasterSize,
+    #             "radius": rasterRadius,
+    #             "filename": "to.tif"
+    #         }
+    #     ]
+    # }
+    # toRaster = json.dumps(toRaster)
+    # pipeline = pdal.Pipeline(toRaster)
+    # pipeline.validate()
+    # pipeline.execute()
 
 def show_rasters():
 
