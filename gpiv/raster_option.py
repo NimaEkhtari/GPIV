@@ -1,17 +1,33 @@
 import pdal
 import json
 import math
-import matplotlib.pyplot as plt
-import rasterio
-import rasterio.plot
-import numpy as np
+
+
+def clean_multiple(num, multiple, direction):
+
+    remainder = abs(num) % multiple
+
+    if remainder == 0:
+        return num
+    
+    if direction == 'up':
+        if num < 0:
+            return num + remainder
+        else:
+            return num + multiple - remainder
+    else:
+        if num < 0:
+            return num - multiple + remainder
+        else:
+            return num - remainder
+
 
 def create_rasters(fromLAS, toLAS, rasterSize):
 
     rasterRadius = float(rasterSize)*math.sqrt(0.5)
 
-    # get bounding box
-    test = {
+    # determined the raster bounds that will force the 'from' raster to use horizontal coordinates that are clean multiples of the raster resolution
+    fromJson = {
         "pipeline":[
             fromLAS,
             {
@@ -20,134 +36,86 @@ def create_rasters(fromLAS, toLAS, rasterSize):
             }
         ]
     }
-    test = json.dumps(test) # converts test from a dict to a string for pdal
-    pipeline = pdal.Pipeline(test)
+    fromJson = json.dumps(fromJson) # converts from a dict to a string for pdal
+    pipeline = pdal.Pipeline(fromJson)
     pipeline.validate()
-    test1 = pipeline.execute()
-    print(test1)
-    test2 = pipeline.metadata
-    print(type(test2))
-    result = json.loads(test2)
-    print(type(result))
-    result1 = result.get('metadata').get('readers.las')[0].get('maxx')
-    print(result1)
-   
-    
+    pipeline.execute()
 
-    # # raster 'from' points with pdal
-    # fromRaster = {
-    #     "pipeline": [
-    #         fromLAS,
-    #         {
-    #             "resolution": rasterSize,
-    #             "radius": rasterRadius,
-    #             "filename": "from.tif"
-    #         }
-    #     ]
-    # }
-    # fromRaster = json.dumps(fromRaster)
-    # pipeline = pdal.Pipeline(fromRaster)
-    # pipeline.validate()
-    # pipeline.execute()
+    meta = pipeline.metadata
+    meta = json.loads(meta) # converts from a string to a dict
 
-    # # raster 'to' points with pdal
-    # toRaster = {
-    #     "pipeline": [
-    #         toLAS,
-    #         {
-    #             "resolution": rasterSize,
-    #             "radius": rasterRadius,
-    #             "filename": "to.tif"
-    #         }
-    #     ]
-    # }
-    # toRaster = json.dumps(toRaster)
-    # pipeline = pdal.Pipeline(toRaster)
-    # pipeline.validate()
-    # pipeline.execute()
+    minx = meta.get('metadata').get('readers.las')[0].get('minx')
+    maxx = meta.get('metadata').get('readers.las')[0].get('maxx')
+    miny = meta.get('metadata').get('readers.las')[0].get('miny')
+    maxy = meta.get('metadata').get('readers.las')[0].get('maxy')
 
-def show_rasters():
+    minx = clean_multiple(minx, float(rasterSize), 'down')
+    maxx = clean_multiple(maxx, float(rasterSize), 'up')
+    miny = clean_multiple(miny, float(rasterSize), 'down')
+    maxy = clean_multiple(maxy, float(rasterSize), 'up')
 
-    # get the data
-    fromRaster = rasterio.open('from.tif')
-    fromHeight =  fromRaster.read(3, masked=True) # read band to numpy array
-    fromStd = fromRaster.read(6, masked=True)
+    bounds = "([" + str(minx) + "," + str(maxx) + "],[" + str(miny) + "," + str(maxy) + "])"
 
-    toRaster = rasterio.open('to.tif')
-    toHeight = toRaster.read(3, masked=True)
-    toStd = toRaster.read(6, masked=True) 
-        
-    # Determine common bounds for 'to' and 'from' raster spatial extents and
-    # values so that differences in extents and values are apparent when
-    # plotted.
-    # 1. Determine bounding box encompassing both the 'from' and 'to' rasters
-    fromLRBT = list(rasterio.plot.plotting_extent(fromRaster)) # LRBT = [left, right, bottom, top]
-    toLRBT = list(rasterio.plot.plotting_extent(toRaster))
-    LRBT = list()
-    LRBT.append(min(fromLRBT[0], toLRBT[0]))
-    LRBT.append(max(fromLRBT[1], toLRBT[1]))
-    LRBT.append(min(fromLRBT[2], toLRBT[2]))
-    LRBT.append(max(fromLRBT[3], toLRBT[3]))
-    # 2. Get maximum and minimum array values for both the 'from' and 'to' rasters. Using percentiles to avoid outliers.
-    minHeight = min(np.percentile(fromHeight.compressed(), 1), np.percentile(toHeight.compressed(), 1))
-    maxHeight = max(np.percentile(fromHeight.compressed(), 99), np.percentile(toHeight.compressed(), 99))
-    minStd = min(np.percentile(fromStd.compressed(), 1), np.percentile(toStd.compressed(), 1))
-    maxStd = max(np.percentile(fromStd.compressed(), 99), np.percentile(toStd.compressed(), 99))
+    # raster 'from' points with pdal
+    fromRaster = {
+        "pipeline": [
+            fromLAS,
+            {
+                "resolution": rasterSize,
+                "radius": rasterRadius,
+                "bounds": bounds,
+                "filename": "from.tif"
+            }
+        ]
+    }
+    fromRaster = json.dumps(fromRaster)
+    pipeline = pdal.Pipeline(fromRaster)
+    pipeline.validate()
+    pipeline.execute()
 
-    # plot height rasters
-    f, (axFrom, axTo) = plt.subplots(1, 2, figsize=(16,9))   
+    # determined the raster bounds that will force the 'to' raster to use horizontal coordinates that are clean multiples of the raster resolution
+    toJson = {
+        "pipeline":[
+            toLAS,
+            {
+                "type":"filters.stats",
+                "dimensions":"X,Y"
+            }
+        ]
+    }
+    toJson = json.dumps(toJson) # converts from a dict to a string for pdal
+    pipeline = pdal.Pipeline(toJson)
+    pipeline.validate()
+    pipeline.execute()
 
-    im = axFrom.imshow(fromHeight,
-                    cmap='jet',
-                    extent=fromLRBT,
-                    vmin=minHeight,
-                    vmax=maxHeight)
-    axFrom.set_xlim(LRBT[0], LRBT[1])
-    axFrom.set_ylim(LRBT[2], LRBT[3])
-    axFrom.set_title('Height: From')
+    meta = pipeline.metadata
+    meta = json.loads(meta) # converts from a string to a dict
 
-    im = axTo.imshow(toHeight,
-                    cmap='jet',
-                    extent=toLRBT,
-                    vmin=minHeight,
-                    vmax=maxHeight)   
-    axTo.set_xlim(LRBT[0], LRBT[1])
-    axTo.set_ylim(LRBT[2], LRBT[3])
-    axTo.set_title('Height: To')
+    minx = meta.get('metadata').get('readers.las')[0].get('minx')
+    maxx = meta.get('metadata').get('readers.las')[0].get('maxx')
+    miny = meta.get('metadata').get('readers.las')[0].get('miny')
+    maxy = meta.get('metadata').get('readers.las')[0].get('maxy')
 
-    f.colorbar(im, 
-            ax=[axFrom, axTo], 
-            orientation='horizontal', 
-            aspect=40)
+    minx = clean_multiple(minx, float(rasterSize), 'down')
+    maxx = clean_multiple(maxx, float(rasterSize), 'up')
+    miny = clean_multiple(miny, float(rasterSize), 'down')
+    maxy = clean_multiple(maxy, float(rasterSize), 'up')
 
-    # plot std rasters
-    f, (axFrom, axTo) = plt.subplots(1, 2, figsize=(16,9))    
-    
-    im = axFrom.imshow(fromStd,
-                    cmap='jet',
-                    extent=fromLRBT,
-                    vmin=minStd,
-                    vmax=maxStd)
-    axFrom.set_xlim(LRBT[0], LRBT[1])
-    axFrom.set_ylim(LRBT[2], LRBT[3])
-    axFrom.set_title('Std: From')
+    bounds = "([" + str(minx) + "," + str(maxx) + "],[" + str(miny) + "," + str(maxy) + "])"
 
-    im = axTo.imshow(toStd,
-                    cmap='jet',
-                    extent=toLRBT,
-                    vmin=minStd,
-                    vmax=maxStd)   
-    axTo.set_xlim(LRBT[0], LRBT[1])
-    axTo.set_ylim(LRBT[2], LRBT[3])
-    axTo.set_title('Std: To')
-
-    f.colorbar(im, 
-        ax=[axFrom, axTo], 
-        orientation='horizontal', 
-        aspect=40)
-
-    plt.show()
-
-    # close rasterio connections    
-    fromRaster.close()
-    toRaster.close()
+    # raster 'to' points with pdal
+    toRaster = {
+        "pipeline": [
+            toLAS,
+            {
+                "resolution": rasterSize,
+                "radius": rasterRadius,
+                "bounds": bounds,
+                "filename": "to.tif"
+            }
+        ]
+    }
+    toRaster = json.dumps(toRaster)
+    pipeline = pdal.Pipeline(toRaster)
+    pipeline.validate()
+    pipeline.execute()

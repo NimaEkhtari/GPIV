@@ -4,7 +4,7 @@ gpiv
 Usage:
   gpiv.py raster <fromLAS> <toLAS> <rasterSize>
   gpiv.py polygon 
-  gpiv.py piv <windowSize> <stepSize> [--propagate]
+  gpiv.py piv <templateSize> <stepSize> [--propagate]
   gpiv.py show
 
 Options:
@@ -16,6 +16,7 @@ from docopt import docopt
 import raster_option
 import polygon_option
 import piv_option
+import show_option
 import os
 import sys
 import rasterio
@@ -74,6 +75,10 @@ if __name__ == '__main__':
     # check to.tif exists and is geotiff
 
     # call piv
-    piv_option.piv()
+    piv_option.piv(float(arguments['<templateSize>']), float(arguments['<stepSize>']))
 
     # print(arguments)
+  
+  if arguments['show']:
+
+    show_option.show_rasters()
