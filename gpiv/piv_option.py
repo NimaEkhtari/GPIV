@@ -5,6 +5,7 @@ from shapely import geometry
 import numpy as np
 import math
 from skimage.feature import match_template
+import matplotlib.pyplot as plt
 
 def get_image_arrays():    
 
@@ -49,30 +50,51 @@ def piv(templateSize, stepSize):
     searchSize = templateSize*2
     imageShape = fromHeight.shape # [height, width]
     uCount = math.floor((imageShape[1]-searchSize) / stepSize)
+    print("uCount=%u" % uCount)
     vCount = math.floor((imageShape[0]-searchSize) / stepSize)
+    print("vCount=%u" % vCount)
 
     # cycle through each search area
-    for i in range(uCount):
-        for j in range(vCount):
+    for i in range(vCount):
+        print("i=%u" % i)
+        for j in range(uCount):
+            print("j=%u" % j)
             # get template area data from the 'from' height and error images
-            templateStartU = int(i*stepSize + math.ceil(templateSize/2))
-            templateEndU = int(i*stepSize + math.ceil(templateSize/2) + templateSize)
-            templateStartV = int(j*stepSize + math.ceil(templateSize/2))
-            templateEndV = int(j*stepSize + math.ceil(templateSize/2) + templateSize)
-            templateHeight = fromHeight[templateStartU:templateEndU, templateStartV:templateEndV]
-            templateError = fromError[templateStartU:templateEndU, templateStartV:templateEndV]
+            templateStartU = int(j*stepSize + math.ceil(templateSize/2))
+            print("templateStartU=%u" % templateStartU)
+            templateEndU = int(j*stepSize + math.ceil(templateSize/2) + templateSize)
+            print("templateEndU=%u" % templateEndU)
+            templateStartV = int(i*stepSize + math.ceil(templateSize/2))
+            print("templateStartV=%u" % templateStartV)
+            templateEndV = int(i*stepSize + math.ceil(templateSize/2) + templateSize)
+            print("templateEndV=%u" % templateEndV)
+            templateHeight = fromHeight[templateStartU:templateEndU, templateStartV:templateEndV].copy()
+            print(templateHeight.shape)
+            templateError = fromError[templateStartU:templateEndU, templateStartV:templateEndV].copy()
             # get search area data from the 'to' height and error images
-            searchStartU = int(i*stepSize)
-            searchEndU = int(i*stepSize + 2*templateSize)
-            searchStartV = int(j*stepSize)
-            searchEndV = int(j*stepSize + 2*templateSize)
-            searchHeight = toHeight[searchStartU:searchEndU, searchStartV:searchEndV]
-            searchError = toError[searchStartU:searchEndU, searchStartV:searchEndV]
+            searchStartU = int(j*stepSize)
+            print("searchStartU=%u" % searchStartU)
+            searchEndU = int(j*stepSize + 2*templateSize)
+            print("searchEndU=%u" % searchEndU)
+            searchStartV = int(i*stepSize)
+            print("searchStartV=%u" % searchStartV)
+            searchEndV = int(i*stepSize + 2*templateSize)
+            print("searchEndV=%u" % searchEndV)
+            searchHeight = toHeight[searchStartU:searchEndU, searchStartV:searchEndV].copy()
+            print(searchHeight.shape)
+            searchError = toError[searchStartU:searchEndU, searchStartV:searchEndV].copy()
 
             # NEED TO HANDLE EMPTY CELLS (value = -9999 or NaN)
 
             # move to next area if the template is flat, which breaks the correlation computation
             if (templateHeight.max() - templateHeight.min()) == 0:
+                print("flat template")
+                # plt.imshow(fromHeight)
+                # plt.title("From")
+                # plt.show()
+                # plt.imshow(toHeight)
+                # plt.title("To")
+                # plt.show()
                 continue
             
             # normalized cross correlation between the template and search area height data
@@ -85,9 +107,14 @@ def piv(templateSize, stepSize):
             templateHeight /= templateHeight.max()
             searchHeight /= searchHeight.max()
 
+            # plt.imshow(fromHeight, cmap=plt.cm.gray)
+            # plt.title("From")
+            # plt.show()
+            # plt.imshow(toHeight, cmap=plt.cm.gray)
+            # plt.title("To")
+            # plt.show()
 
-            import matplotlib.pyplot as plt
-            fig = plt.figure()
+            fig1 = plt.figure()
             ax1 = plt.subplot(1, 3, 1)
             ax2 = plt.subplot(1, 3, 2)
             ax3 = plt.subplot(1, 3, 3)
@@ -97,6 +124,19 @@ def piv(templateSize, stepSize):
             ax1.imshow(templateHeight, cmap=plt.cm.gray)
             ax2.imshow(searchHeight, cmap=plt.cm.gray)
             ax3.imshow(test, cmap=plt.cm.gray)
+
+            fig2 = plt.figure()
+            ax1 = plt.subplot(1, 2, 1)
+            ax2 = plt.subplot(1, 2, 2)
+            ax1.set_title('FROM')
+            ax2.set_title('TO')
+            ax1.imshow(fromHeight, cmap=plt.cm.gray)
+            ax2.imshow(toHeight, cmap=plt.cm.gray)
             plt.show()
+
+
+
+
+
 
 
