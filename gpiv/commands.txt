@@ -1,0 +1,2 @@
+python gpiv.py raster C:\dev\data\PIVDemoFiles\LidarPointClouds\CanadaGlacier_NASA.las C:\dev\data\PIVDemoFiles\LidarPointClouds\CanadaGlacier_NCALM.las 5
+python gpiv.py piv 64 32

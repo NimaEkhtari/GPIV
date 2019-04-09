@@ -26,7 +26,7 @@ def create_rasters(fromLAS, toLAS, rasterSize):
 
     rasterRadius = float(rasterSize)*math.sqrt(0.5)
 
-    # determined the raster bounds that will force the 'from' raster to use horizontal coordinates that are clean multiples of the raster resolution
+    # determine the raster bounds that will force the 'from' raster to use horizontal coordinates that are clean multiples of the raster resolution
     fromJson = {
         "pipeline":[
             fromLAS,
@@ -73,7 +73,7 @@ def create_rasters(fromLAS, toLAS, rasterSize):
     pipeline.validate()
     pipeline.execute()
 
-    # determined the raster bounds that will force the 'to' raster to use horizontal coordinates that are clean multiples of the raster resolution
+    # determine the raster bounds that will force the 'to' raster to use horizontal coordinates that are clean multiples of the raster resolution
     toJson = {
         "pipeline":[
             toLAS,

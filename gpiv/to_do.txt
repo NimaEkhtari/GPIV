@@ -1,0 +1,6 @@
+1. provide user feedback during lidar to raster processing
+2. elegantly handle missing pixels. right now they are set to 0, but this distorts the correlation and generates false results on edges.
+3.
+
+Notes:
+1. Numpy nan values produce nan correlation (skimage match_template) results.
