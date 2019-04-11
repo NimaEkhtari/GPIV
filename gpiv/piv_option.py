@@ -65,44 +65,34 @@ def piv(templateSize, stepSize):
     searchSize = templateSize*2
     imageShape = fromHeight.shape # [height (rows), width (columns)]
     uCount = math.floor((imageShape[1]-searchSize) / stepSize)
-    # print("uCount=%u" % uCount)
     vCount = math.floor((imageShape[0]-searchSize) / stepSize)
-    # print("vCount=%u" % vCount)
 
     # cycle through each search area
     originUV = []
     offsetUV = []
+    fig = plt.figure()
+    ax1 = plt.subplot(1, 2, 1)
+    ax2 = plt.subplot(1, 2, 2)
     for i in range(vCount):
         for j in range(uCount):
 
             # get template area data from the 'from' height and error images
             templateStartU = int(j*stepSize + math.ceil(templateSize/2))
-            # print("templateStartU=%u" % templateStartU)
             templateEndU = int(j*stepSize + math.ceil(templateSize/2) + templateSize)
-            # print("templateEndU=%u" % templateEndU)
             templateStartV = int(i*stepSize + math.ceil(templateSize/2))
-            # print("templateStartV=%u" % templateStartV)
             templateEndV = int(i*stepSize + math.ceil(templateSize/2) + templateSize)
-            # print("templateEndV=%u" % templateEndV)
             templateHeight = fromHeight[templateStartV:templateEndV, templateStartU:templateEndU].copy()
-            # print(templateHeight.shape)
             templateError = fromError[templateStartV:templateEndV, templateStartU:templateEndU].copy()
             # get search area data from the 'to' height and error images
             searchStartU = int(j*stepSize)
-            # print("searchStartU=%u" % searchStartU)
             searchEndU = int(j*stepSize + searchSize + (templateSize % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
-            # print("searchEndU=%u" % searchEndU)
             searchStartV = int(i*stepSize)
-            # print("searchStartV=%u" % searchStartV)
             searchEndV = int(i*stepSize + searchSize + (templateSize % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
-            # print("searchEndV=%u" % searchEndV)
             searchHeight = toHeight[searchStartV:searchEndV, searchStartU:searchEndU].copy()
-            # print(searchHeight.shape)
             searchError = toError[searchStartV:searchEndV, searchStartU:searchEndU].copy()            
 
             # move to next area if the template is flat, which breaks the correlation computation
             if ((templateHeight.max() - templateHeight.min()) == 0):
-                # print("flat template")
                 continue
             
             # normalized cross correlation between the template and search area height data            
@@ -114,45 +104,29 @@ def piv(templateSize, stepSize):
                 subPxPeak = [0,0]
             else:
                 subPxPeak = subpx_peak_taylor(ncc[nccMax[0].item(0)-1:nccMax[0].item(0)+2, nccMax[1].item(0)-1:nccMax[1].item(0)+2])
-                # print(subPxPeak)
-                # fig = plt.figure()
-                # plt.imshow(ncc[nccMax[0].item(0)-1:nccMax[0].item(0)+2, nccMax[1].item(0)-1:nccMax[1].item(0)+2])
-                # plt.colorbar()
-                # plt.show()  
                       
             # store vector origin and end points            
             originUV.append(((j*stepSize + templateSize - (1 - templateSize % 2)*0.5), (i*stepSize + templateSize - (1 - templateSize % 2)*0.5))) # the expression containing the modulo operator adjusts even-sized template origins to be between pixel centers
             offsetUV.append(((nccMax[1] - math.ceil(templateSize/2) + subPxPeak[0]), (nccMax[0] - math.ceil(templateSize/2) + subPxPeak[1])))
 
-            # fig1 = plt.figure()
-            # ax1 = plt.subplot(1, 3, 1)
-            # ax2 = plt.subplot(1, 3, 2)
-            # ax3 = plt.subplot(1, 3, 3)
-            # ax1.set_title('Template')
-            # ax2.set_title('Search')
-            # ax3.set_title('NCC - Max at {}'.format(nccMaxIdx))
-            # ax1.imshow(templateHeight, cmap=plt.cm.gray)
-            # ax2.imshow(searchHeight, cmap=plt.cm.gray)
-            # ax3.imshow(ncc, cmap=plt.cm.gray)            
-            
-            # fig2 = plt.figure()
-            ax1 = plt.subplot(1, 2, 1)
-            plt.cla()
-            ax2 = plt.subplot(1, 2, 2)
+            # show progress on 'from' and 'to' images
+            plt.sca(ax1)
             plt.cla()
             ax1.set_title('FROM')
-            ax2.set_title('TO')
             ax1.imshow(fromHeight, cmap=plt.cm.gray)
-            ax2.imshow(toHeight, cmap=plt.cm.gray)
             ax1.add_patch(Rectangle((templateStartU,templateStartV), templateSize-1, templateSize-1, linewidth=1, edgecolor='r',fill=None))
+            plt.sca(ax2)
+            plt.cla()
+            ax2.set_title('TO')            
+            ax2.imshow(toHeight, cmap=plt.cm.gray)            
             ax2.add_patch(Rectangle((searchStartU,searchStartV), searchSize-1, searchSize-1, linewidth=1, edgecolor='r',fill=None))
-            plt.pause(0.1)
+            plt.pause(0.01)
 
-            # plt.show()
 
-    # plot vectors on top of from image
+    # plot vectors on top of 'from' image
+    plt.close(fig)
     fig, ax = plt.subplots()
-    ax.imshow(fromHeight, cmap=plt.cm.gray)
+    plt.imshow(fromHeight, cmap=plt.cm.gray)
     originUV = np.asarray(originUV)
     offsetUV = np.asarray(offsetUV)
     ax.quiver(originUV[...,0], originUV[:,1], offsetUV[:,0], offsetUV[:,1], angles='xy', color='r', linewidth=0)
@@ -165,14 +139,3 @@ def piv(templateSize, stepSize):
     jsonOut = originOffset.tolist()
     json.dump(jsonOut, open("piv_origins_offsets.json", "w"))
     print('PIV vector origins and offsets saved to file piv_origins_offsets.json')
-
-
-
-
-
-
-
-
-
-
-
