@@ -5,13 +5,16 @@ Usage:
   gpiv.py raster <fromLAS> <toLAS> <rasterSize>
   gpiv.py polygon 
   gpiv.py piv <templateSize> <stepSize> [--propagate]
-  gpiv.py show
+  gpiv.py show [--error] [--overlay]
 
 Options:
   -h --help       Show this screen.
   -v --version    Show version.
-  -p --propagate  Propagate raster height error.
+  --propagate     Propagate raster error.
+  --error         Show error raster (height raster is shown by default).
+  --overlay       Overlay PIV vectors on raster.
   '''
+
 from docopt import docopt
 import raster_option
 import polygon_option
