@@ -7,7 +7,7 @@ Not so Easy To-Do:
 1. elegantly handle missing pixels. right now they are set to 0, but this distorts the correlation and generates false results on edges.
 2. check how the correlation field produced by match_template, which uses a Fourier transform, compares to the field produced by standard spatial correlation
 3. check ratio of highest to second highest correlation peak as a measure of solution strength
-4. update subpixel peak finder to handle cases where the peak pixel is on the edge of the correlation matrix
+4. update subpixel peak finder to handle cases where the peak pixel is on the edge of the correlation matrix; note this will also impact the extraction of data for the error propagation
 
 Notes:
 1. Numpy nan values produce nan correlation (skimage match_template) results.

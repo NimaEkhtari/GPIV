@@ -77,8 +77,13 @@ if __name__ == '__main__':
     
     # check to.tif exists and is geotiff
 
+    # check that templateSize and stepSize are integers
+
     # call piv
-    piv_option.piv(float(arguments['<templateSize>']), float(arguments['<stepSize>']))
+    myPiv = piv_option.Piv()
+    myPiv.compute(int(arguments['<templateSize>']), int(arguments['<stepSize>']), arguments['--propagate'])
+    if arguments['--propagate']:
+      myPiv.propagate()
 
     # print(arguments)
   
