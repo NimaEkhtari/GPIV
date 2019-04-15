@@ -20,6 +20,9 @@ class Piv:
         self.searchStore = []
         self.searchErrorStore = []
         self.correlationStore = []
+        self.subPxUvStore = []
+        # HARD-CODED perturbation value for generating numeric partial derivatives
+        self.p = 0.00001
 
     def compute(self, templateSize, stepSize, propFlag):
         # get image arrays of common (overlapping) area
@@ -65,7 +68,8 @@ class Piv:
 
                 # sub-pixel peak location
                 if nccMax[0]==0 or nccMax[1]==0 or nccMax[0]==ncc.shape[0]-1 or nccMax[1]==ncc.shape[1]-1: # the subpixel interpolator can not handle peak locations on the edges of the correlation matrix
-                    subPxPeak = [0,0]
+                    # subPxPeak = [0,0]
+                    continue
                 else:
                     subPxPeak = self._subpx_peak_taylor(ncc[nccMax[0].item(0)-1:nccMax[0].item(0)+2, nccMax[1].item(0)-1:nccMax[1].item(0)+2])
                         
@@ -77,9 +81,10 @@ class Piv:
                 if propFlag:
                     self.templateStore.append(templateHeight)
                     self.templateErrorStore.append(templateError)
-                    self.searchStore.append(searchHeight[nccMax[0].item(0)-1:nccMax[0].item(0)+templateSize+2, nccMax[1].item(0)-1:nccMax[1].item(0)+templateSize+2]) # templateSize+2 x templateSize+2 subarray of the search array
-                    self.searchErrorStore.append(searchError[nccMax[0].item(0)-1:nccMax[0].item(0)+templateSize+2, nccMax[1].item(0)-1:nccMax[1].item(0)+templateSize+2]) # templateSize+2 x templateSize+2 subarray of the search error array
+                    self.searchStore.append(searchHeight[nccMax[0].item(0)-1:nccMax[0].item(0)+templateSize+1, nccMax[1].item(0)-1:nccMax[1].item(0)+templateSize+1]) # templateSize+2 x templateSize+2 subarray of the search array
+                    self.searchErrorStore.append(searchError[nccMax[0].item(0)-1:nccMax[0].item(0)+templateSize+1, nccMax[1].item(0)-1:nccMax[1].item(0)+templateSize+1]) # templateSize+2 x templateSize+2 subarray of the search error array
                     self.correlationStore.append(ncc[nccMax[0].item(0)-1:nccMax[0].item(0)+2, nccMax[1].item(0)-1:nccMax[1].item(0)+2]) # 3x3 array of correlation values centered on the correlation peak
+                    self.subPxUvStore.append(subPxPeak)
 
                 # show progress on 'from' and 'to' images
                 plt.sca(ax1)
@@ -114,51 +119,69 @@ class Piv:
         json.dump(jsonOut, open("piv_origins_offsets.json", "w"))
         print('PIV vector origins and offsets saved to file piv_origins_offsets.json')
 
+        # test
+        for i in range(len(self.templateStore)):
+            print('Record %u:' % i)
+            print('templateStore shape = {}'.format(self.templateStore[i].shape))
+            print('templateErrorStore shape = {}'.format(self.templateErrorStore[i].shape))
+            print('searchStore shape = {}'.format(self.searchStore[i].shape))
+            print('searchErrorStore shape = {}'.format(self.searchErrorStore[i].shape))
+            print('correlationStore size = %u' % self.correlationStore[i].size)
+            print('subPxUvStore size = %u' % len(self.subPxUvStore[i]))
+
+
+
     def propagate(self):
         # cycle through each set of stored data
+        subPxPeakCov = []
         for i in range(len(self.templateStore)):
+            # show progress on plot in some way: maybe the large search area with the template location inside it on the 'from' plot
+            print('template number %u' % i)
+
             # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
             nccCov = self._prop_px2corr(self.templateStore[i], self.templateErrorStore[i], self.searchStore[i], self.searchErrorStore[i], self.correlationStore[i])
 
             # propagate the correlation covariance into the sub-pixel peak location
-            subPxPeakCov = self._prop_corr2peak()
+            subPxPeakCov.append(self._prop_corr2peak(self.correlationStore[i], nccCov, self.subPxUvStore[i]))
 
-            # export peak location covariance to json file
+        # export peak location covariance to json file
+        json.dump(subPxPeakCov, open("piv_covariance_matrices.json", "w"))
+        print('PIV displacement covariance matrices saved to file piv_covariance_matrices.json')
 
-            # plot vectors and peak error ellipses on top of 'from' image
-    
-    def _prop_corr2peak():
-        
+        # plot vectors and peak error ellipses on top of 'from' image
     
     def _prop_px2corr(self, template, templateError, search, searchError, ncc):
         # form diagonal covariance matrix from template and search patch covariance arrays
         templateCovVec = templateError.reshape(templateError.size,) # convert array to vector, row-by-row
         searchCovVec = searchError.reshape(searchError.size,)
-        covVec = np.hstack(templateCovVec, searchCovVec)
+        covVec = np.hstack((templateCovVec, searchCovVec))
         C = np.diag(covVec)
 
         # get the Jacobian
         J = self._ncc_jacobian(template, search, ncc)
+        print('Jacobian size = %u' % J.size)
 
-        # propagate the template and search area errors into the 9 correlation elements
+        # propagate the template and search area errors into the 9 correlation elements; the covariance order is by row of the ncc array (i.e., ncc[0,0], ncc[0,1], ncc[0,2], ncc[1,0], ncc[1,1], ...)
         nccCov = np.matmul(np.matmul(J,C),J.T)
 
         return nccCov
 
     def _ncc_jacobian(self, template, search, ncc):
-        # HARD-CODED perturbation value for genearting numeric partial derivatives
-        p = 0.00001
-
         # define some loop sizes and pre-allocate the Jacobian
         tRow, tCol = template.shape
+        print(tRow)
+        print(tCol)
         sRow, sCol = search.shape
-        jacobian = np.zeros(9, template.size + search.size)
+        print(sRow)
+        print(sCol)
+        jacobian = np.zeros((9, template.size + search.size))
 
-        # cycle through the 3x3 correlation array
+        # cycle through the 3x3 correlation array, row-by-row
         for i in range(3): # rows
             for j in range(3): # columns
                 # pull out the sub-area of the search patch
                 searchSub = search[i:i+tRow, j:j+tCol]
+                print(searchSub.size)
 
                 # preallocate arrays to store the template and search partial derivates
                 templatePartials = np.zeros((tRow, tCol))
@@ -169,23 +192,41 @@ class Piv:
                     for n in range(tCol):
                         # perturb
                         templatePerturb = template.copy() # we make a copy here because we will modify an element (do not want that modification to change the original value)
-                        templatePerturb[m,n] += p
+                        templatePerturb[m,n] += self.p
                         searchSubPerturb = searchSub.copy()
-                        searchSubPerturb[m,n] += p
+                        searchSubPerturb[m,n] += self.p
 
                         # compute perturbed ncc
                         nccTemplatePerturb = match_template(templatePerturb, searchSub)
                         nccSearchPerturb = match_template(template, searchSubPerturb)
                         
                         # numeric partial derivatives
-                        templatePartials[m,n] = (nccTemplatePerturb - ncc[i,j]) / (2*p)
-                        searchPartials[i+m,j+n] = (nccSearchPerturb - ncc[i,j]) / (2*p) # the location adjustment by i and j accounts for the larger size of the search area than the template area
+                        templatePartials[m,n] = (nccTemplatePerturb - ncc[i,j]) / (self.p)
+                        searchPartials[i+m,j+n] = (nccSearchPerturb - ncc[i,j]) / (self.p) # the location adjustment by i and j accounts for the larger size of the search area than the template area
 
                 # reshape the partial derivatives from their current array form to vector form and store in the Jacobian; note that we match the row-by-row pattern used to form the covariance matrix in the calling function
                 jacobian[i*3+j, 0:template.size] = templatePartials.reshape(templatePartials.size,)
                 jacobian[i*3+j, template.size:template.size+search.size] = searchPartials.reshape(searchPartials.size,)
         
         return jacobian
+
+    def _prop_corr2peak(self, ncc, nccCov, deltaUV):
+        # pre-allocate Jacobian
+        jacobian = np.zeros((2,9))
+
+        # cycle through the 3x3 correlation array, row-by-row, and create the jacobian matrix
+        for i in range(3): # rows
+            for j in range(3): # columns
+                nccPerturb = ncc.copy()
+                nccPerturb[i,j] += self.p
+                deltaUPerturb, deltaVPerturb = self._subpx_peak_taylor(nccPerturb)
+                jacobian[0,i*3+j] = (deltaUPerturb - deltaUV[0]) / (self.p)
+                jacobian[1,i*3+j] = (deltaVPerturb - deltaUV[1]) / (self.p)
+        
+        # propagate the 3x3 array of correlation uncertainties into the sub-pixel U and V direction offsets
+        subPxPeakCov = np.matmul(np.matmul(jacobian,nccCov),jacobian.T)
+                
+        return subPxPeakCov
 
     def _get_image_arrays(self):    
         # read in the 'from' and 'to' images as numpy arrays (currently assumes multiple layers in the from and to image files)
@@ -225,7 +266,7 @@ class Piv:
         delX = -(dyy*dx - dxy*dy) / (dxx*dyy - dxy*dxy)
         delY = -(dxx*dy - dxy*dx) / (dxx*dyy - dxy*dxy)
 
-        return [delX, delY] # delX is left-to-right; delY is top-to-bottom
+        return [delX, delY] # delX is left-to-right; delY is top-to-bottom; note that delX == delU and delY == delV
     
 
 
