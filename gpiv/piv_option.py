@@ -14,6 +14,7 @@ import json
 class Piv:
 
     def __init__(self):
+        # lists to store numpy arrays of data necessary for the optional error propagation
         self.templateStore = []
         self.templateErrorStore = []
         self.searchStore = []
@@ -21,7 +22,6 @@ class Piv:
         self.correlationStore = []
 
     def compute(self, templateSize, stepSize, propFlag):
-
         # get image arrays of common (overlapping) area
         fromHeight, fromError, toHeight, toError = self._get_image_arrays()
 
@@ -115,10 +115,79 @@ class Piv:
         print('PIV vector origins and offsets saved to file piv_origins_offsets.json')
 
     def propagate(self):
+        # cycle through each set of stored data
+        for i in range(len(self.templateStore)):
+            # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
+            nccCov = self._prop_px2corr(self.templateStore[i], self.templateErrorStore[i], self.searchStore[i], self.searchErrorStore[i], self.correlationStore[i])
 
+            # propagate the correlation covariance into the sub-pixel peak location
+            subPxPeakCov = self._prop_corr2peak()
+
+            # export peak location covariance to json file
+
+            # plot vectors and peak error ellipses on top of 'from' image
+    
+    def _prop_corr2peak():
+        
+    
+    def _prop_px2corr(self, template, templateError, search, searchError, ncc):
+        # form diagonal covariance matrix from template and search patch covariance arrays
+        templateCovVec = templateError.reshape(templateError.size,) # convert array to vector, row-by-row
+        searchCovVec = searchError.reshape(searchError.size,)
+        covVec = np.hstack(templateCovVec, searchCovVec)
+        C = np.diag(covVec)
+
+        # get the Jacobian
+        J = self._ncc_jacobian(template, search, ncc)
+
+        # propagate the template and search area errors into the 9 correlation elements
+        nccCov = np.matmul(np.matmul(J,C),J.T)
+
+        return nccCov
+
+    def _ncc_jacobian(self, template, search, ncc):
+        # HARD-CODED perturbation value for genearting numeric partial derivatives
+        p = 0.00001
+
+        # define some loop sizes and pre-allocate the Jacobian
+        tRow, tCol = template.shape
+        sRow, sCol = search.shape
+        jacobian = np.zeros(9, template.size + search.size)
+
+        # cycle through the 3x3 correlation array
+        for i in range(3): # rows
+            for j in range(3): # columns
+                # pull out the sub-area of the search patch
+                searchSub = search[i:i+tRow, j:j+tCol]
+
+                # preallocate arrays to store the template and search partial derivates
+                templatePartials = np.zeros((tRow, tCol))
+                searchPartials = np.zeros((sRow, sCol))
+
+                # now cycle through each template and sub-search area pixel and numerically estimate its partial derivate with respect to the normalized cross correlation
+                for m in range(tRow):
+                    for n in range(tCol):
+                        # perturb
+                        templatePerturb = template.copy() # we make a copy here because we will modify an element (do not want that modification to change the original value)
+                        templatePerturb[m,n] += p
+                        searchSubPerturb = searchSub.copy()
+                        searchSubPerturb[m,n] += p
+
+                        # compute perturbed ncc
+                        nccTemplatePerturb = match_template(templatePerturb, searchSub)
+                        nccSearchPerturb = match_template(template, searchSubPerturb)
+                        
+                        # numeric partial derivatives
+                        templatePartials[m,n] = (nccTemplatePerturb - ncc[i,j]) / (2*p)
+                        searchPartials[i+m,j+n] = (nccSearchPerturb - ncc[i,j]) / (2*p) # the location adjustment by i and j accounts for the larger size of the search area than the template area
+
+                # reshape the partial derivatives from their current array form to vector form and store in the Jacobian; note that we match the row-by-row pattern used to form the covariance matrix in the calling function
+                jacobian[i*3+j, 0:template.size] = templatePartials.reshape(templatePartials.size,)
+                jacobian[i*3+j, template.size:template.size+search.size] = searchPartials.reshape(searchPartials.size,)
+        
+        return jacobian
 
     def _get_image_arrays(self):    
-
         # read in the 'from' and 'to' images as numpy arrays (currently assumes multiple layers in the from and to image files)
         fromRaster = rasterio.open('from.tif')
         toRaster = rasterio.open('to.tif')
