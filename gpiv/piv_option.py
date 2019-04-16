@@ -6,7 +6,7 @@ import numpy as np
 import math
 from skimage.feature import match_template
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+import matplotlib.patches as pch
 import time
 import json
 
@@ -21,6 +21,12 @@ class Piv:
         self.searchErrorStore = []
         self.correlationStore = []
         self.subPxUvStore = []
+        self.searchBoxStore = []
+        self.templateBoxStore = []
+        self.toHeightStore = np.array([])
+        self.fromHeightStore = np.array([])
+        self.originUvStore = []
+        self.offsetUvStore = []
         # HARD-CODED perturbation value for generating numeric partial derivatives
         self.p = 0.00001
 
@@ -67,49 +73,40 @@ class Piv:
                 nccMax = np.where(ncc == np.amax(ncc))
 
                 # sub-pixel peak location
-                if nccMax[0]==0 or nccMax[1]==0 or nccMax[0]==ncc.shape[0]-1 or nccMax[1]==ncc.shape[1]-1: # the subpixel interpolator can not handle peak locations on the edges of the correlation matrix
-                    # subPxPeak = [0,0]
+                if nccMax[0][0]==0 or nccMax[1][0]==0 or nccMax[0][0]==ncc.shape[0]-1 or nccMax[1][0]==ncc.shape[1]-1: # the subpixel interpolator can not handle peak locations on the edges of the correlation matrix
                     continue
                 else:
-                    subPxPeak = self._subpx_peak_taylor(ncc[nccMax[0].item(0)-1:nccMax[0].item(0)+2, nccMax[1].item(0)-1:nccMax[1].item(0)+2])
+                    subPxPeak = self._subpx_peak_taylor(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2])
                         
                 # store vector origin and end points            
                 originUV.append(((j*stepSize + templateSize - (1 - templateSize % 2)*0.5), (i*stepSize + templateSize - (1 - templateSize % 2)*0.5))) # the expression containing the modulo operator adjusts even-sized template origins to be between pixel centers
-                offsetUV.append(((nccMax[1] - math.ceil(templateSize/2) + subPxPeak[0]), (nccMax[0] - math.ceil(templateSize/2) + subPxPeak[1])))
+                offsetUV.append(((nccMax[1][0] - math.ceil(templateSize/2) + subPxPeak[0]), (nccMax[0][0] - math.ceil(templateSize/2) + subPxPeak[1])))
 
                 # store data for error propagation if necessary
                 if propFlag:
+                    # data for propagation computations
                     self.templateStore.append(templateHeight)
                     self.templateErrorStore.append(templateError)
-                    self.searchStore.append(searchHeight[nccMax[0].item(0)-1:nccMax[0].item(0)+templateSize+1, nccMax[1].item(0)-1:nccMax[1].item(0)+templateSize+1]) # templateSize+2 x templateSize+2 subarray of the search array
-                    self.searchErrorStore.append(searchError[nccMax[0].item(0)-1:nccMax[0].item(0)+templateSize+1, nccMax[1].item(0)-1:nccMax[1].item(0)+templateSize+1]) # templateSize+2 x templateSize+2 subarray of the search error array
-                    self.correlationStore.append(ncc[nccMax[0].item(0)-1:nccMax[0].item(0)+2, nccMax[1].item(0)-1:nccMax[1].item(0)+2]) # 3x3 array of correlation values centered on the correlation peak
+                    self.searchStore.append(searchHeight[nccMax[0][0]-1:nccMax[0][0]+templateSize+1, nccMax[1][0]-1:nccMax[1][0]+templateSize+1]) # templateSize+2 x templateSize+2 subarray of the search array
+                    self.searchErrorStore.append(searchError[nccMax[0][0]-1:nccMax[0][0]+templateSize+1, nccMax[1][0]-1:nccMax[1][0]+templateSize+1]) # templateSize+2 x templateSize+2 subarray of the search error array
+                    self.correlationStore.append(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2]) # 3x3 array of correlation values centered on the correlation peak
                     self.subPxUvStore.append(subPxPeak)
+                    # data for status plot
+                    self.searchBoxStore.append([searchStartU, searchEndV, searchSize-1, searchSize-1]) # [left, bottom, width, height]; the '-1' operations adjust the box so it is plotted correctly
+                    self.templateBoxStore.append([searchStartU+nccMax[1][0], searchEndV+nccMax[0][0], templateSize-1, templateSize-1])                    
 
                 # show progress on 'from' and 'to' images
                 plt.sca(ax1)
                 plt.cla()
                 ax1.set_title('FROM')
                 ax1.imshow(fromHeight, cmap=plt.cm.gray)
-                ax1.add_patch(Rectangle((templateStartU,templateStartV), templateSize-1, templateSize-1, linewidth=1, edgecolor='r',fill=None))
+                ax1.add_patch(pch.Rectangle((templateStartU,templateEndV), templateSize-1, templateSize-1, linewidth=1, edgecolor='r',fill=None))
                 plt.sca(ax2)
                 plt.cla()
                 ax2.set_title('TO')            
                 ax2.imshow(toHeight, cmap=plt.cm.gray)            
-                ax2.add_patch(Rectangle((searchStartU,searchStartV), searchSize-1, searchSize-1, linewidth=1, edgecolor='r',fill=None))
+                ax2.add_patch(pch.Rectangle((searchStartU,searchEndV), searchSize-1, searchSize-1, linewidth=1, edgecolor='r',fill=None))
                 plt.pause(0.01)
-
-
-        # plot vectors on top of 'from' image
-        plt.close(fig)
-        fig, ax = plt.subplots()
-        plt.imshow(fromHeight, cmap=plt.cm.gray)
-        originUV = np.asarray(originUV)
-        offsetUV = np.asarray(offsetUV)
-        ax.quiver(originUV[...,0], originUV[:,1], offsetUV[:,0], offsetUV[:,1], angles='xy', color='r', linewidth=0)
-        if propFlag:
-            plt.ion() # prevent the plot from stopping code execution since we don't want the user to have to close a plot in order to move on to error propagation
-        plt.show()
 
         # export vector origins and offsets to json file
         originUV = np.squeeze(originUV)
@@ -119,36 +116,68 @@ class Piv:
         json.dump(jsonOut, open("piv_origins_offsets.json", "w"))
         print('PIV vector origins and offsets saved to file piv_origins_offsets.json')
 
-        # test
-        for i in range(len(self.templateStore)):
-            print('Record %u:' % i)
-            print('templateStore shape = {}'.format(self.templateStore[i].shape))
-            print('templateErrorStore shape = {}'.format(self.templateErrorStore[i].shape))
-            print('searchStore shape = {}'.format(self.searchStore[i].shape))
-            print('searchErrorStore shape = {}'.format(self.searchErrorStore[i].shape))
-            print('correlationStore size = %u' % self.correlationStore[i].size)
-            print('subPxUvStore size = %u' % len(self.subPxUvStore[i]))
-
+        # wrap it up with a plot vectors on top of 'from' image or by storing the toHeight image for later use
+        plt.close(fig)
+        if propFlag:
+            # data for status and final error propagation plots 
+            self.fromHeightStore = fromHeight
+            self.toHeightStore = toHeight
+            self.originUvStore = originUV
+            self.offsetUvStore = offsetUV
+        else: # only show vectors if we are not moving on to propagate errors
+            fig, ax = plt.subplots()
+            plt.imshow(fromHeight, cmap=plt.cm.gray)
+            originUV = np.asarray(originUV)
+            offsetUV = np.asarray(offsetUV)
+            ax.quiver(originUV[:,0], originUV[:,1], offsetUV[:,0], offsetUV[:,1], angles='xy', color='r', linewidth=0)
+            plt.show()
 
 
     def propagate(self):
         # cycle through each set of stored data
-        subPxPeakCov = []
-        for i in range(len(self.templateStore)):
-            # show progress on plot in some way: maybe the large search area with the template location inside it on the 'from' plot
-            print('template number %u' % i)
+        # subPxPeakCov = []
+        # fig, ax = plt.subplots()
+        # for i in range(len(self.templateStore)):
+        #     # show progress on the 'to' image                        
+        #     plt.cla()
+        #     ax.set_title("Error Propagation Location ('TO' Image)")
+        #     ax.imshow(self.toHeightStore, cmap=plt.cm.gray)
+        #     ax.add_patch(pch.Rectangle((self.searchBoxStore[i][0], self.searchBoxStore[i][1]), self.searchBoxStore[i][2], self.searchBoxStore[i][3], linewidth=1, edgecolor='r',fill=None))
+        #     ax.add_patch(pch.Rectangle((self.templateBoxStore[i][0], self.templateBoxStore[i][1]), self.templateBoxStore[i][2], self.templateBoxStore[i][3], linewidth=1, edgecolor='r',fill=None))
+        #     plt.pause(0.01)
 
-            # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
-            nccCov = self._prop_px2corr(self.templateStore[i], self.templateErrorStore[i], self.searchStore[i], self.searchErrorStore[i], self.correlationStore[i])
+        #     # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
+        #     nccCov = self._prop_px2corr(self.templateStore[i], self.templateErrorStore[i], self.searchStore[i], self.searchErrorStore[i], self.correlationStore[i])
 
-            # propagate the correlation covariance into the sub-pixel peak location
-            subPxPeakCov.append(self._prop_corr2peak(self.correlationStore[i], nccCov, self.subPxUvStore[i]))
+        #     # propagate the correlation covariance into the sub-pixel peak location
+        #     peakCov = self._prop_corr2peak(self.correlationStore[i], nccCov, self.subPxUvStore[i])
 
-        # export peak location covariance to json file
-        json.dump(subPxPeakCov, open("piv_covariance_matrices.json", "w"))
-        print('PIV displacement covariance matrices saved to file piv_covariance_matrices.json')
+        #     # store for plotting or json output; we convert to a list here for simple json output
+        #     subPxPeakCov.append(peakCov.tolist())
 
-        # plot vectors and peak error ellipses on top of 'from' image
+        # # export peak location covariance to json file
+        # json.dump(subPxPeakCov, open("piv_covariance_matrices.json", "w"))
+        # print('PIV displacement covariance matrices saved to file piv_covariance_matrices.json')
+
+        # # plot vectors and peak error ellipses on top of 'from' image
+        # plt.close(fig)
+        # the default will be to scale the median displacement magnitudes and error ellipse semi-major axes to 1/40 the maximum image dimension; additional user-defined scale factor will be required in future
+        maxImgDim = np.amax(self.fromHeightStore.shape)
+        vecNorms = np.linalg.norm(self.offsetUvStore, axis=1)
+        medianVecNorm = np.median(vecNorms)
+        vecScale = (maxImgDim / 40) / medianVecNorm
+        headSize = medianVecNorm*vecScale / 3
+        fig, ax = plt.subplots()
+        plt.imshow(self.fromHeightStore, cmap=plt.cm.gray)
+        for i in range(len(self.originUvStore)):
+            #add arrow
+            a = pch.FancyArrow(self.originUvStore[i][0], self.originUvStore[i][1], self.offsetUvStore[i][0]*vecScale, self.offsetUvStore[i][1]*vecScale, length_includes_head=True, head_width=headSize, head_length=headSize, overhang=0.8, fc='red', ec='red')
+            e = pch.Ellipse((400,400), 50, 100, angle=45)
+            ax.add_artist(a)
+            ax.add_artist(e)
+    
+        plt.show()
+
     
     def _prop_px2corr(self, template, templateError, search, searchError, ncc):
         # form diagonal covariance matrix from template and search patch covariance arrays
@@ -159,7 +188,7 @@ class Piv:
 
         # get the Jacobian
         J = self._ncc_jacobian(template, search, ncc)
-        print('Jacobian size = %u' % J.size)
+        # print('Jacobian size = %u' % J.size)
 
         # propagate the template and search area errors into the 9 correlation elements; the covariance order is by row of the ncc array (i.e., ncc[0,0], ncc[0,1], ncc[0,2], ncc[1,0], ncc[1,1], ...)
         nccCov = np.matmul(np.matmul(J,C),J.T)
@@ -169,11 +198,11 @@ class Piv:
     def _ncc_jacobian(self, template, search, ncc):
         # define some loop sizes and pre-allocate the Jacobian
         tRow, tCol = template.shape
-        print(tRow)
-        print(tCol)
+        # print(tRow)
+        # print(tCol)
         sRow, sCol = search.shape
-        print(sRow)
-        print(sCol)
+        # print(sRow)
+        # print(sCol)
         jacobian = np.zeros((9, template.size + search.size))
 
         # cycle through the 3x3 correlation array, row-by-row
@@ -181,7 +210,7 @@ class Piv:
             for j in range(3): # columns
                 # pull out the sub-area of the search patch
                 searchSub = search[i:i+tRow, j:j+tCol]
-                print(searchSub.size)
+                # print(searchSub.size)
 
                 # preallocate arrays to store the template and search partial derivates
                 templatePartials = np.zeros((tRow, tCol))
