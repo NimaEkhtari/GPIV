@@ -30,6 +30,7 @@ class Piv:
         # HARD-CODED perturbation value for generating numeric partial derivatives
         self.p = 0.00001
 
+
     def compute(self, templateSize, stepSize, propFlag):
         # get image arrays of common (overlapping) area
         fromHeight, fromError, toHeight, toError = self._get_image_arrays()
@@ -135,45 +136,63 @@ class Piv:
 
     def propagate(self):
         # cycle through each set of stored data
-        # subPxPeakCov = []
-        # fig, ax = plt.subplots()
-        # for i in range(len(self.templateStore)):
-        #     # show progress on the 'to' image                        
-        #     plt.cla()
-        #     ax.set_title("Error Propagation Location ('TO' Image)")
-        #     ax.imshow(self.toHeightStore, cmap=plt.cm.gray)
-        #     ax.add_patch(pch.Rectangle((self.searchBoxStore[i][0], self.searchBoxStore[i][1]), self.searchBoxStore[i][2], self.searchBoxStore[i][3], linewidth=1, edgecolor='r',fill=None))
-        #     ax.add_patch(pch.Rectangle((self.templateBoxStore[i][0], self.templateBoxStore[i][1]), self.templateBoxStore[i][2], self.templateBoxStore[i][3], linewidth=1, edgecolor='r',fill=None))
-        #     plt.pause(0.01)
+        subPxPeakCov = []
+        fig, ax = plt.subplots()
+        for i in range(len(self.templateStore)):
+            # show progress on the 'to' image                        
+            plt.cla()
+            ax.set_title("Error Propagation Status: Computation Location")
+            ax.imshow(self.toHeightStore, cmap=plt.cm.gray)
+            # ax.add_patch(pch.Rectangle((self.searchBoxStore[i][0], self.searchBoxStore[i][1]), self.searchBoxStore[i][2], self.searchBoxStore[i][3], linewidth=1, edgecolor='r',fill=None))
+            ax.add_patch(pch.Rectangle((self.templateBoxStore[i][0], self.templateBoxStore[i][1]), self.templateBoxStore[i][2], self.templateBoxStore[i][3], linewidth=1, edgecolor='r',fill=None))
+            plt.pause(0.1)
 
-        #     # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
-        #     nccCov = self._prop_px2corr(self.templateStore[i], self.templateErrorStore[i], self.searchStore[i], self.searchErrorStore[i], self.correlationStore[i])
+            # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
+            nccCov = self._prop_px2corr(self.templateStore[i], self.templateErrorStore[i], self.searchStore[i], self.searchErrorStore[i], self.correlationStore[i])
 
-        #     # propagate the correlation covariance into the sub-pixel peak location
-        #     peakCov = self._prop_corr2peak(self.correlationStore[i], nccCov, self.subPxUvStore[i])
+            # propagate the correlation covariance into the sub-pixel peak location
+            peakCov = self._prop_corr2peak(self.correlationStore[i], nccCov, self.subPxUvStore[i])
 
-        #     # store for plotting or json output; we convert to a list here for simple json output
-        #     subPxPeakCov.append(peakCov.tolist())
+            # store for plotting and json output; we convert to a list here for simple json output
+            subPxPeakCov.append(peakCov.tolist())
 
-        # # export peak location covariance to json file
-        # json.dump(subPxPeakCov, open("piv_covariance_matrices.json", "w"))
-        # print('PIV displacement covariance matrices saved to file piv_covariance_matrices.json')
+        # close status figure and save peak location covariance matrices to json file
+        plt.close(fig)
+        json.dump(subPxPeakCov, open("piv_covariance_matrices.json", "w"))
+        print('PIV displacement covariance matrices saved to file piv_covariance_matrices.json')
 
-        # # plot vectors and peak error ellipses on top of 'from' image
-        # plt.close(fig)
-        # the default will be to scale the median displacement magnitudes and error ellipse semi-major axes to 1/40 the maximum image dimension; additional user-defined scale factor will be required in future
+        # plot displacement vectors and 68% confidence (1-sigma) error ellipses on top of 'from' image
+        # the computed vectors will be scaled such that the median vector displacement magnitude is 1/30 the maximum image dimension
         maxImgDim = np.amax(self.fromHeightStore.shape)
         vecNorms = np.linalg.norm(self.offsetUvStore, axis=1)
         medianVecNorm = np.median(vecNorms)
-        vecScale = (maxImgDim / 40) / medianVecNorm
-        headSize = medianVecNorm*vecScale / 3
+        vecScale = (maxImgDim / 30) / medianVecNorm
+        vecHeadSize = medianVecNorm*vecScale / 3
+        # the computed ellipses will be scaled such that the median semimajor axis magnitude is 1/60 the maximum image dimension
+        semimajor = []
+        semiminor = []
+        angle = []
+        for i in range(len(self.originUvStore)):
+            eigenVals, eigenVecs = np.linalg.eig(subPxPeakCov[i])
+            idxMax = np.argmax(eigenVals)
+            idxMin = np.argmin(eigenVals)
+            semimajor.append(math.sqrt(2.298*eigenVals[idxMax])) # scale factor of 2.298 to create a 68% confidence ellipse
+            semiminor.append(math.sqrt(2.298*eigenVals[idxMin]))
+            angle.append(np.degrees(np.arctan(eigenVecs[idxMax][1]/eigenVecs[idxMax][0])))
+        medianSemimajor = np.median(semimajor)
+        ellScale = (maxImgDim / 45) / medianSemimajor
+
         fig, ax = plt.subplots()
         plt.imshow(self.fromHeightStore, cmap=plt.cm.gray)
         for i in range(len(self.originUvStore)):
-            #add arrow
-            a = pch.FancyArrow(self.originUvStore[i][0], self.originUvStore[i][1], self.offsetUvStore[i][0]*vecScale, self.offsetUvStore[i][1]*vecScale, length_includes_head=True, head_width=headSize, head_length=headSize, overhang=0.8, fc='red', ec='red')
-            e = pch.Ellipse((400,400), 50, 100, angle=45)
+            # add arrow
+            a = pch.FancyArrow(self.originUvStore[i][0], self.originUvStore[i][1], 
+                               self.offsetUvStore[i][0]*vecScale, self.offsetUvStore[i][1]*vecScale, 
+                               length_includes_head=True, head_width=vecHeadSize, head_length=vecHeadSize, overhang=0.8, fc='red', ec='red')
             ax.add_artist(a)
+            # add ellipse centered at location of actual (not scaled) displacement            
+            e = pch.Ellipse((self.originUvStore[i][0]+self.offsetUvStore[i][0], self.originUvStore[i][1]+self.offsetUvStore[i][1]), 
+                            semimajor[i]*ellScale, semiminor[i]*ellScale, angle=angle[i])            
             ax.add_artist(e)
     
         plt.show()
@@ -194,6 +213,7 @@ class Piv:
         nccCov = np.matmul(np.matmul(J,C),J.T)
 
         return nccCov
+
 
     def _ncc_jacobian(self, template, search, ncc):
         # define some loop sizes and pre-allocate the Jacobian
@@ -239,6 +259,7 @@ class Piv:
         
         return jacobian
 
+
     def _prop_corr2peak(self, ncc, nccCov, deltaUV):
         # pre-allocate Jacobian
         jacobian = np.zeros((2,9))
@@ -256,6 +277,7 @@ class Piv:
         subPxPeakCov = np.matmul(np.matmul(jacobian,nccCov),jacobian.T)
                 
         return subPxPeakCov
+
 
     def _get_image_arrays(self):    
         # read in the 'from' and 'to' images as numpy arrays (currently assumes multiple layers in the from and to image files)
@@ -284,6 +306,7 @@ class Piv:
         toErrorCropped, t = rasterio.mask.mask(toRaster, [bpoly], crop=True, nodata=0, indexes=6)
 
         return fromHeightCropped, fromErrorCropped, toHeightCropped, toErrorCropped
+
 
     def _subpx_peak_taylor(self, ncc):
         dx = (ncc[1,2] - ncc[1,0]) / 2
