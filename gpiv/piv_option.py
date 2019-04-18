@@ -188,11 +188,11 @@ class Piv:
             # add arrow
             a = pch.FancyArrow(self.originUvStore[i][0], self.originUvStore[i][1], 
                                self.offsetUvStore[i][0]*vecScale, self.offsetUvStore[i][1]*vecScale, 
-                               length_includes_head=True, head_width=vecHeadSize, head_length=vecHeadSize, overhang=0.8, fc='red', ec='red')
+                               length_includes_head=True, head_width=vecHeadSize, head_length=vecHeadSize, overhang=0.8, fc='green', ec='green')
             ax.add_artist(a)
             # add ellipse centered at location of actual (not scaled) displacement            
             e = pch.Ellipse((self.originUvStore[i][0]+self.offsetUvStore[i][0], self.originUvStore[i][1]+self.offsetUvStore[i][1]), 
-                            semimajor[i]*ellScale, semiminor[i]*ellScale, angle=angle[i])            
+                            semimajor[i]*ellScale, semiminor[i]*ellScale, angle=angle[i], fc='None', ec='red')            
             ax.add_artist(e)
     
         plt.show()
