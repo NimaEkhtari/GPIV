@@ -1,6 +1,7 @@
 import pdal
 import json
 import math
+import rasterio
 
 
 def clean_multiple(num, multiple, direction):
@@ -25,6 +26,8 @@ def clean_multiple(num, multiple, direction):
 def create_rasters(fromLAS, toLAS, rasterSize):
 
     rasterRadius = float(rasterSize)*math.sqrt(0.5)
+
+    print("Generating the 'From' raster")
 
     # determine the raster bounds that will force the 'from' raster to use horizontal coordinates that are clean multiples of the raster resolution
     fromJson = {
@@ -73,6 +76,20 @@ def create_rasters(fromLAS, toLAS, rasterSize):
     pipeline.validate()
     pipeline.execute()
 
+    # save the 'from' height and error images as separate tif files
+    with rasterio.open('from.tif') as src:
+        fromHeight =  src.read(3) # read height band to numpy array
+        fromError = src.read(6)
+        profile = src.profile
+    
+    profile.update(count=1)    
+    with rasterio.open('fromHeight.tif', 'w', **profile) as dst:
+        dst.write(fromHeight, 1)
+    with rasterio.open('fromError.tif', 'w', **profile) as dst:
+        dst.write(fromError, 1)
+
+
+    print("Generating the 'To' raster")
     # determine the raster bounds that will force the 'to' raster to use horizontal coordinates that are clean multiples of the raster resolution
     toJson = {
         "pipeline":[
@@ -119,3 +136,15 @@ def create_rasters(fromLAS, toLAS, rasterSize):
     pipeline = pdal.Pipeline(toRaster)
     pipeline.validate()
     pipeline.execute()
+
+    # save the 'to' height and error images as separate tif files
+    with rasterio.open('to.tif') as src:
+        toHeight =  src.read(3) # read height band to numpy array
+        toError = src.read(6)    
+        profile = src.profile
+    
+    profile.update(count=1)    
+    with rasterio.open('toHeight.tif', 'w', **profile) as dst:
+        dst.write(toHeight, 1)
+    with rasterio.open('toError.tif', 'w', **profile) as dst:
+        dst.write(toError, 1)

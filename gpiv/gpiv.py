@@ -43,7 +43,6 @@ if __name__ == '__main__':
 	arguments = docopt(__doc__)
 
 	if arguments['raster']: 
-
 		# check fromFile is valid
 		if not os.path.isfile(arguments['<fromLAS>']):
 			print('Invalid fromLAS file.')
@@ -76,7 +75,6 @@ if __name__ == '__main__':
 		polygon_option.create_polygon()
 
 	if arguments['piv']:
-
 		# check from.tif exists and is geotiff
 		
 		# check to.tif exists and is geotiff
@@ -117,15 +115,15 @@ if __name__ == '__main__':
 			print("PIV vector file 'piv_covariance matrices.json' missing.")
 			sys.exit()
 
-		if arguments['--vectors'] and not is_positive_number(arguments['vectorScaleFactor']):
+		if arguments['--vectors'] and not is_positive_number(arguments['<vectorScaleFactor>']):
 			print('PIV displacement vector scale factor must be greater than 0.')
 			sys.exit()
 
-		if arguments['--ellipses'] and not is_positive_number(arguments['ellipseScaleFactor']):
+		if arguments['--ellipses'] and not is_positive_number(arguments['<ellipseScaleFactor>']):
 			print('PIV error ellipse scale factor must be greater than 0.')
 			sys.exit()
 		
 		show_option.show(arguments['--from'], arguments['--to'],
 		             	 arguments['--height'], arguments['--error'],
-						 arguments['--vectors'], arguments['vectorScaleFactor'],
-						 arguments['--ellipses'], arguments['ellipseScaleFactor'])
+						 arguments['--vectors'], arguments['<vectorScaleFactor>'],
+						 arguments['--ellipses'], arguments['<ellipseScaleFactor>'])
