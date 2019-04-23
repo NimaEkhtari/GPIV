@@ -30,9 +30,9 @@ def plot_vectors(ax, vecSF):
         d = json.load(jsonFile)
         
     for i in range(len(d)):
-        # add arrow - NEED TO ADD IN THE IMAGE OFFSET VALUE...
-        a = patch.FancyArrow(d[i][0], d[i][1], d[i][2]*vecSF, d[i][3]*vecSF, 
-                            length_includes_head=True, head_width=vecSF, head_length=vecSF, overhang=0.8, fc='green', ec='green')
+        # add arrow with base at vector origin
+        a = patch.FancyArrow(d[i][0], d[i][1], d[i][2]*vecSF, -d[i][3]*vecSF, # the negative sign converts from dV (postive down) to dY (positive up)
+                            length_includes_head=True, head_width=vecSF*10, head_length=vecSF*10, overhang=0.8, fc='green', ec='green')
         ax.add_artist(a)
 
 
@@ -44,14 +44,14 @@ def plot_ellipses(ax, ellSF):
     
     for i in range(len(d)):
         # semi-major and minor axes directions and half-lengths
-        eigenVals, eigenVecs = np.linalg.eig(d[i])
+        eigenVals, eigenVecs = np.linalg.eig(c[i])
         idxMax = np.argmax(eigenVals)
         idxMin = np.argmin(eigenVals)
         semimajor = math.sqrt(2.298*eigenVals[idxMax]) # scale factor of 2.298 to create a 68% confidence ellipse
         semiminor = math.sqrt(2.298*eigenVals[idxMin])
         angle = np.degrees(np.arctan(eigenVecs[idxMax][1]/eigenVecs[idxMax][0]))
         # add ellipse centered at location of actual (not scaled) displacement            
-        e = patch.Ellipse((d[i][0]+d[i][2], d[i][1]+d[i][3]), semimajor*ellSF, semiminor*ellSF, 
+        e = patch.Ellipse((d[i][0]+d[i][2], d[i][1]-d[i][3]), semimajor*ellSF, semiminor*ellSF, # the negative sign in 'd[i][1]-d[i][3]' converts from dV (postive down) to dY (positive up)
                           angle=angle, fc='None', ec='red')            
         ax.add_artist(e)
 
@@ -80,6 +80,7 @@ def plot_raster(f, t, h, e):
                 plotLRBT = list(rasterio.plot.plotting_extent(src)) 
             plotTitle = 'To (error)'
 
+    src.close()
     plotMin = min(np.percentile(plotRaster.compressed(), 1), np.percentile(plotRaster.compressed(), 1))
     plotMax = max(np.percentile(plotRaster.compressed(), 99), np.percentile(plotRaster.compressed(), 99))
     ax = plt.gca()

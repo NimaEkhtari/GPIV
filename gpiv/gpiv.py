@@ -29,14 +29,6 @@ import sys
 import rasterio
 import numpy as np
 
-def is_positive_number(n):
-	try:
-		x = float(n)
-		if x <= 0:
-			return False
-	except ValueError:
-		return False
-	return True
 
 if __name__ == '__main__':
 
@@ -79,15 +71,10 @@ if __name__ == '__main__':
 		
 		# check to.tif exists and is geotiff
 
-		# check that templateSize and stepSize are integers
+		# check that templateSize and stepSize are positive integers
 
-		# call piv
-		myPiv = piv_option.Piv()
-		myPiv.compute(int(arguments['<templateSize>']), int(arguments['<stepSize>']), arguments['--propagate'])
-		if arguments['--propagate']:
-			myPiv.propagate()
-
-		# print(arguments)
+		# run piv
+		piv_option.piv(int(arguments['<templateSize>']), int(arguments['<stepSize>']), arguments['--propagate'])
 	
 	if arguments['show']:
 		# check for required file existence
@@ -127,3 +114,12 @@ if __name__ == '__main__':
 		             	 arguments['--height'], arguments['--error'],
 						 arguments['--vectors'], arguments['<vectorScaleFactor>'],
 						 arguments['--ellipses'], arguments['<ellipseScaleFactor>'])
+
+def is_positive_number(n):
+	try:
+		x = float(n)
+		if x <= 0:
+			return False
+	except ValueError:
+		return False
+	return True

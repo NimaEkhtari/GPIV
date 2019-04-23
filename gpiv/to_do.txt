@@ -1,8 +1,5 @@
 Easy To-Do:
-1. provide user feedback during lidar to raster processing
-2. add ability to show height and error rasters
-3. add ability to show PIV results on the 'from' height raster
-4. create separate fromHeight.tif, toHeight.tif, fromError.tif, toError.tif files after rasterization. this will allow users to supply their own images.
+1. add ability to show height and error rasters
 
 Not so Easy To-Do:
 1. elegantly handle missing pixels. right now they are set to 0, but this distorts the correlation and generates false results on edges.
