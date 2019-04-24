@@ -1,5 +1,5 @@
 Easy To-Do:
-1. add ability to show height and error rasters
+1. Show both rasters after creation
 
 Not so Easy To-Do:
 1. elegantly handle missing pixels. right now they are set to 0, but this distorts the correlation and generates false results on edges.
