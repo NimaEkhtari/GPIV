@@ -2,6 +2,7 @@ import pdal
 import json
 import math
 import rasterio
+import show_option
 
 
 def clean_multiple(num, multiple, direction):
@@ -23,24 +24,34 @@ def clean_multiple(num, multiple, direction):
             return num - remainder
 
 
-def create_rasters(fromLAS, toLAS, rasterSize):
+def create_rasters(lasFile, rasterSize, f, t):
 
     rasterRadius = float(rasterSize)*math.sqrt(0.5)
+    if f:
+        fromOrTo = 'From'
+        rasterFileName = 'from.tif'
+        heightFileName = 'fromHeight.tif'
+        errorFileName = 'fromError.tif'
+    if t:
+        fromOrTo = 'To'
+        rasterFileName = 'to.tif'
+        heightFileName = 'toHeight.tif'
+        errorFileName = 'toError.tif'
 
-    print("Generating the 'From' raster")
+    print("Generating the '{}' raster".format(fromOrTo))
 
-    # determine the raster bounds that will force the 'from' raster to use horizontal coordinates that are clean multiples of the raster resolution
-    fromJson = {
+    # determine the raster bounds that will force the raster to use horizontal coordinates that are clean multiples of the raster resolution
+    jsonDict = {
         "pipeline":[
-            fromLAS,
+            lasFile,
             {
                 "type":"filters.stats",
                 "dimensions":"X,Y"
             }
         ]
     }
-    fromJson = json.dumps(fromJson) # converts from a dict to a string for pdal
-    pipeline = pdal.Pipeline(fromJson)
+    jsonString = json.dumps(jsonDict) # converts from a dict to a string for pdal
+    pipeline = pdal.Pipeline(jsonString)
     pipeline.validate()
     pipeline.execute()
 
@@ -59,92 +70,35 @@ def create_rasters(fromLAS, toLAS, rasterSize):
 
     bounds = "([" + str(minx) + "," + str(maxx) + "],[" + str(miny) + "," + str(maxy) + "])"
 
-    # raster 'from' points with pdal
-    fromRaster = {
+    # raster points with pdal
+    jsonDict = {
         "pipeline": [
-            fromLAS,
+            lasFile,
             {
                 "resolution": rasterSize,
                 "radius": rasterRadius,
                 "bounds": bounds,
-                "filename": "from.tif"
+                "filename": rasterFileName
             }
         ]
     }
-    fromRaster = json.dumps(fromRaster)
-    pipeline = pdal.Pipeline(fromRaster)
+    jsonString = json.dumps(jsonDict)
+    pipeline = pdal.Pipeline(jsonString)
     pipeline.validate()
     pipeline.execute()
 
-    # save the 'from' height and error images as separate tif files
-    with rasterio.open('from.tif') as src:
-        fromHeight =  src.read(3) # read height band to numpy array
-        fromError = src.read(6)
+    # save the height and error images as separate tif files
+    with rasterio.open(rasterFileName) as src:
+        heightRaster =  src.read(3) # read height band to numpy array
+        errorRaster = src.read(6)
         profile = src.profile
     
     profile.update(count=1)    
-    with rasterio.open('fromHeight.tif', 'w', **profile) as dst:
-        dst.write(fromHeight, 1)
-    with rasterio.open('fromError.tif', 'w', **profile) as dst:
-        dst.write(fromError, 1)
+    with rasterio.open(heightFileName, 'w', **profile) as dst:
+        dst.write(heightRaster, 1)
+    with rasterio.open(errorFileName, 'w', **profile) as dst:
+        dst.write(errorRaster, 1)
 
-
-    print("Generating the 'To' raster")
-    # determine the raster bounds that will force the 'to' raster to use horizontal coordinates that are clean multiples of the raster resolution
-    toJson = {
-        "pipeline":[
-            toLAS,
-            {
-                "type":"filters.stats",
-                "dimensions":"X,Y"
-            }
-        ]
-    }
-    toJson = json.dumps(toJson) # converts from a dict to a string for pdal
-    pipeline = pdal.Pipeline(toJson)
-    pipeline.validate()
-    pipeline.execute()
-
-    meta = pipeline.metadata
-    meta = json.loads(meta) # converts from a string to a dict
-
-    minx = meta.get('metadata').get('readers.las')[0].get('minx')
-    maxx = meta.get('metadata').get('readers.las')[0].get('maxx')
-    miny = meta.get('metadata').get('readers.las')[0].get('miny')
-    maxy = meta.get('metadata').get('readers.las')[0].get('maxy')
-
-    minx = clean_multiple(minx, float(rasterSize), 'down')
-    maxx = clean_multiple(maxx, float(rasterSize), 'up')
-    miny = clean_multiple(miny, float(rasterSize), 'down')
-    maxy = clean_multiple(maxy, float(rasterSize), 'up')
-
-    bounds = "([" + str(minx) + "," + str(maxx) + "],[" + str(miny) + "," + str(maxy) + "])"
-
-    # raster 'to' points with pdal
-    toRaster = {
-        "pipeline": [
-            toLAS,
-            {
-                "resolution": rasterSize,
-                "radius": rasterRadius,
-                "bounds": bounds,
-                "filename": "to.tif"
-            }
-        ]
-    }
-    toRaster = json.dumps(toRaster)
-    pipeline = pdal.Pipeline(toRaster)
-    pipeline.validate()
-    pipeline.execute()
-
-    # save the 'to' height and error images as separate tif files
-    with rasterio.open('to.tif') as src:
-        toHeight =  src.read(3) # read height band to numpy array
-        toError = src.read(6)    
-        profile = src.profile
-    
-    profile.update(count=1)    
-    with rasterio.open('toHeight.tif', 'w', **profile) as dst:
-        dst.write(toHeight, 1)
-    with rasterio.open('toError.tif', 'w', **profile) as dst:
-        dst.write(toError, 1)
+    # display the height and error rasters
+    show_option.show(f, t, True, False, False, [], False, [])
+    show_option.show(f, t, False, True, False, [], False, [])

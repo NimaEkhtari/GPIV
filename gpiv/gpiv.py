@@ -2,19 +2,17 @@
 gpiv
 
 Usage:
-  gpiv.py raster <fromLAS> <toLAS> <rasterSize>
-  gpiv.py polygon 
+  gpiv.py raster <lasFile> <rasterSize> (--from | --to)
   gpiv.py piv <templateSize> <stepSize> [--propagate]
   gpiv.py show (--from | --to) (--height | --error) [(--vectors <vectorScaleFactor>)] [(--ellipses <ellipseScaleFactor>)]
 
 Options:
-  -h --help       Show this screen.
-  -v --version    Show version.
+  --help          Show this screen.
   --propagate     Propagate raster error.
-  --from          Show 'from' raster.
-  --to            Show 'to' raster.
-  --height        Show height raster.
-  --error         Show error raster.
+  --from          'From' data.
+  --to            'To' data.
+  --height        Height data.
+  --error         Error data.
   --vectors       Show PIV displacement vectors. You must supply a scale factor.
   --ellipses      Show propagated PIV displacement uncertainty ellipses. You must supply a scale factor.
 '''
@@ -30,28 +28,33 @@ import rasterio
 import numpy as np
 
 
+def is_positive_number(n):
+	try:
+		x = float(n)
+		if x <= 0:
+			return False
+	except ValueError:
+		return False
+	return True
+
+
 if __name__ == '__main__':
 
 	arguments = docopt(__doc__)
 
 	if arguments['raster']: 
-		# check fromFile is valid
-		if not os.path.isfile(arguments['<fromLAS>']):
-			print('Invalid fromLAS file.')
+		# check lasFile is valid
+		if not os.path.isfile(arguments['<lasFile>']):
+			print('Invalid LAS file.')
 			sys.exit()
 
-		# check toFile is valid
-		if not os.path.isfile(arguments['<toLAS>']):
-			print('Invalid toLAS file.')
-			sys.exit()
-
-		# check rasterSize is >0
+		# check rasterSize is positive number
 		if not is_positive_number(arguments['<rasterSize>']):
 			print('Raster size must be a positive number')
 			sys.exit()
 	
 		# raster LAS files
-		raster_option.create_rasters(arguments['<fromLAS>'], arguments['<toLAS>'], arguments['<rasterSize>'])
+		raster_option.create_rasters(arguments['<lasFile>'], arguments['<rasterSize>'], arguments['--from'], arguments['--to'])
 
 		# display height and error rasters
 		# raster_option.show_rasters()
@@ -115,11 +118,3 @@ if __name__ == '__main__':
 						 arguments['--vectors'], arguments['<vectorScaleFactor>'],
 						 arguments['--ellipses'], arguments['<ellipseScaleFactor>'])
 
-def is_positive_number(n):
-	try:
-		x = float(n)
-		if x <= 0:
-			return False
-	except ValueError:
-		return False
-	return True

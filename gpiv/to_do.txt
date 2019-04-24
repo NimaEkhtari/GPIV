@@ -1,10 +1,14 @@
 Easy To-Do:
-1. Show both rasters after creation
+1. Make the raster command only for one point cloud at a time
+2. Show the raster after creation
+3. Add a --both option to the show raster command
+4. Check that the from and to rasters have the same raster cell size and spatially overlap when calling PIV
 
 Not so Easy To-Do:
-1. elegantly handle missing pixels. right now they are set to 0, but this distorts the correlation and generates false results on edges.
-2. check how the correlation field produced by match_template, which uses a Fourier transform, compares to the field produced by standard spatial correlation
-3. check ratio of highest to second highest correlation peak as a measure of solution strength
+1. speed up the error propagation
+2. elegantly handle missing pixels. right now they are set to 0, but this distorts the correlation and generates false results on edges.
+3. check how the correlation field produced by match_template, which uses a Fourier transform, compares to the field produced by standard spatial correlation
+4. check ratio of highest to second highest correlation peak as a measure of solution strength
 
 Notes:
 1. Numpy nan values produce nan correlation (skimage match_template) results.

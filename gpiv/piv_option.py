@@ -158,7 +158,6 @@ def vec_ellipse_scales(offsetUV, subPxPeakCov, maxImgDim, propFlag):
     return vecSF, ellSF
 
 
-
 def prop_px2corr(template, templateError, search, searchError, ncc, p):
     # form diagonal covariance matrix from template and search patch covariance arrays
     templateCovVec = templateError.reshape(templateError.size,) # convert array to vector, row-by-row
@@ -178,11 +177,7 @@ def prop_px2corr(template, templateError, search, searchError, ncc, p):
 def ncc_jacobian(template, search, ncc, p):
     # define some loop sizes and pre-allocate the Jacobian
     tRow, tCol = template.shape
-    # print(tRow)
-    # print(tCol)
     sRow, sCol = search.shape
-    # print(sRow)
-    # print(sCol)
     jacobian = np.zeros((9, template.size + search.size))
 
     # cycle through the 3x3 correlation array, row-by-row
@@ -190,8 +185,7 @@ def ncc_jacobian(template, search, ncc, p):
         for j in range(3): # columns
             # pull out the sub-area of the search patch
             searchSub = search[i:i+tRow, j:j+tCol]
-            # print(searchSub.size)
-
+            
             # preallocate arrays to store the template and search partial derivates
             templatePartials = np.zeros((tRow, tCol))
             searchPartials = np.zeros((sRow, sCol))
