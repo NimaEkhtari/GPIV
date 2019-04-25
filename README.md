@@ -18,4 +18,4 @@ Next steps in development will be validating the error propagation on synthetic 
 ## Usage
 * Type `python gpiv.py --help` to see usage. 
 * You will notice a lot of 'from' and 'to' verbiage. 'From' indicates the older data, whereas 'to' indicates the newer data. The vectors will point from the older data to the newer data. 
-* GPIV stores rasters in geotiff format in the working directory with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well.
+* GPIV stores rasters in geotiff format in the working directory with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well. Don't rename the files - GPIV relies on their given names. Copy them to a new place if you want to save a particular version.
