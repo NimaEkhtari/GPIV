@@ -1,11 +1,12 @@
 # GPIV - Geospatial Particle Imaging Velocimetry
 
 ## Description
-There are plenty of PIV applications out there, but none focused on the geospatial community with built in error propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to certain PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. As of now, GPIV can:  
-- Rasterize a lidar point cloud to a height raster and error raster (more on the error raster below)  
-- Generate 2D displacement vectors from two height rasters via the PIV method  
-- Propagate pixel error (from the error raster) into the 2D displacement vectors  
-- Display resulting PIV vectors and propagated error ellipses on either a height raster or error raster  
+There are plenty of PIV applications out there, but none focused on the geospatial community with built in error propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to certain PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. As of now, GPIV can.
+
+* Rasterize a lidar point cloud to a height raster and error raster (more on the error raster below).
+* Generate 2D displacement vectors from two height rasters via the PIV method.
+* Propagate pixel error (from the error raster) into the 2D displacement vectors.
+* Display resulting PIV vectors and propagated error ellipses on either a height raster or error raster.  
 
 The error raster that GPIV currently produces when rasterizing a lidar point cloud is simply the the standard deviation of lidar point elevations within each raster cell. This is not correct, but it provides a way to test the error propagation for now.
 
