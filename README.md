@@ -1,10 +1,10 @@
 # GPIV - Geospatial Particle Imaging Velocimetry
 
 ## Description
-There are plenty of PIV applications out there, but none focused on the geospatial community with built in error propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to some PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. As of now, GPIV can:  
+There are plenty of PIV applications out there, but none focused on the geospatial community with built in error propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to certain PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. As of now, GPIV can:  
 - Rasterize a lidar point cloud to a height raster and error raster (more on the error raster below)  
 - Generate 2D displacement vectors from two height rasters via the PIV method  
-- Propagate pixel error into the displacement vectors  
+- Propagate pixel error (from the error raster) into the 2D displacement vectors  
 - Display resulting PIV vectors and propagated error ellipses on either a height raster or error raster  
 
 The error raster that GPIV currently produces when rasterizing a lidar point cloud is simply the the standard deviation of lidar point elevations within each raster cell. This is not correct, but it provides a way to test the error propagation for now.
@@ -12,7 +12,9 @@ The error raster that GPIV currently produces when rasterizing a lidar point clo
 ## Status
 I'm not sure this is even in Beta stage yet. The PIV and error propagation works, but the PIV is very basic (single pass, no window deformation) and the error propagation is slooow. There are no tests yet.
 
-Next steps in development will be validating the error propagation on synthetic data, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors.
+Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors.
 
 ## Usage
-* Type `python gpiv.py --help` to see usage. You will notice a lot of 'from' and 'to' verbiage. 'From' indicates the older data, whereas 'to' indicates the newer data. The vectors will point from the older data to the newer data. 
+* Type `python gpiv.py --help` to see usage. 
+* You will notice a lot of 'from' and 'to' verbiage. 'From' indicates the older data, whereas 'to' indicates the newer data. The vectors will point from the older data to the newer data. 
+* GPIV stores rasters in geotiff format in the working directory with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well.
