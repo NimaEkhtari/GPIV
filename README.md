@@ -21,4 +21,4 @@ Next steps in development will be validating the error propagation on synthetic 
 * GPIV stores rasters in geotiff format in the working directory with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well. Don't rename the files; GPIV relies on their given names. Copy them to a new place if you want to save a particular version.
 
 ## Rudimentary Example
-![Rudimentary PIV](https://bitbucket.org/pjh172/gpiv/src/master/rudimentaryPIV.png)
+![Rudimentary PIV](rudimentaryPIV.png)
