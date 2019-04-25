@@ -2,9 +2,9 @@
 gpiv
 
 Usage:
-  gpiv.py raster <lasFile> <rasterSize> (--from | --to)
-  gpiv.py piv <templateSize> <stepSize> [--propagate]
-  gpiv.py show (--from | --to) (--height | --error) [(--vectors <vectorScaleFactor>)] [(--ellipses <ellipseScaleFactor>)]
+  gpiv raster <lasFile> <rasterSize> (--from | --to)
+  gpiv piv <templateSize> <stepSize> [--propagate]
+  gpiv show (--from | --to) (--height | --error) [(--vectors <vectorScaleFactor>)] [(--ellipses <ellipseScaleFactor>)]
 
 Options:
   --help          Show this screen.
@@ -18,10 +18,10 @@ Options:
 '''
 
 from docopt import docopt
-import raster_option
-import polygon_option
-import piv_option
-import show_option
+from .raster_option import create_rasters
+# import .polygon_option
+from .piv_option import  piv
+from .show_option import show
 import os
 import sys
 import rasterio
@@ -38,8 +38,7 @@ def is_positive_number(n):
 	return True
 
 
-if __name__ == '__main__':
-
+def main():
 	arguments = docopt(__doc__)
 
 	if arguments['raster']: 
@@ -54,7 +53,7 @@ if __name__ == '__main__':
 			sys.exit()
 	
 		# raster LAS files
-		raster_option.create_rasters(arguments['<lasFile>'], arguments['<rasterSize>'], arguments['--from'], arguments['--to'])
+		create_rasters(arguments['<lasFile>'], arguments['<rasterSize>'], arguments['--from'], arguments['--to'])
 
 		# display height and error rasters
 		# raster_option.show_rasters()
@@ -77,7 +76,7 @@ if __name__ == '__main__':
 		# check that templateSize and stepSize are positive integers
 
 		# run piv
-		piv_option.piv(int(arguments['<templateSize>']), int(arguments['<stepSize>']), arguments['--propagate'])
+		piv(int(arguments['<templateSize>']), int(arguments['<stepSize>']), arguments['--propagate'])
 	
 	if arguments['show']:
 		# check for required file existence
@@ -113,8 +112,10 @@ if __name__ == '__main__':
 			print('PIV error ellipse scale factor must be greater than 0.')
 			sys.exit()
 		
-		show_option.show(arguments['--from'], arguments['--to'],
-		             	 arguments['--height'], arguments['--error'],
-						 arguments['--vectors'], arguments['<vectorScaleFactor>'],
-						 arguments['--ellipses'], arguments['<ellipseScaleFactor>'])
+		show(arguments['--from'], arguments['--to'],
+		     arguments['--height'], arguments['--error'],
+			 arguments['--vectors'], arguments['<vectorScaleFactor>'],
+			 arguments['--ellipses'], arguments['<ellipseScaleFactor>'])
 
+if __name__ == '__main__':
+	main()
