@@ -59,15 +59,15 @@ if __name__ == '__main__':
 		# display height and error rasters
 		# raster_option.show_rasters()
 
-	if arguments['polygon']:
-		# will want to eventually allow users to optionally input paths to their own geotiffs
+	# if arguments['polygon']:
+	# 	# will want to eventually allow users to optionally input paths to their own geotiffs
 
-		# check from.tif exists and is geotiff
+	# 	# check from.tif exists and is geotiff
 		
-		# check to.tif exists and is geotiff
+	# 	# check to.tif exists and is geotiff
 
-		# call select
-		polygon_option.create_polygon()
+	# 	# call select
+	# 	polygon_option.create_polygon()
 
 	if arguments['piv']:
 		# check from.tif exists and is geotiff
