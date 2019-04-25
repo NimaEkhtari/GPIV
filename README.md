@@ -1,7 +1,7 @@
 # GPIV - Geospatial Particle Imaging Velocimetry
 
 ## Description
-There are plenty of PIV applications out there, but none focused on the geospatial community with built in error propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to certain PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. As of now, GPIV can.
+There are plenty of PIV applications out there, but none focused on the geospatial community with built in error propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to certain PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. As of now, GPIV can:
 
 * Rasterize a lidar point cloud to a height raster and error raster (more on the error raster below).
 * Generate 2D displacement vectors from two height rasters via the PIV method.
