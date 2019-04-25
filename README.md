@@ -23,5 +23,5 @@ Next steps in development will be validating the error propagation on synthetic 
 ## Rudimentary Example
 * Canada glacier.
 * Displacment vectors (green) are scaled by a factor of 5.
-* Error ellipses (red) are 1-sigma and scaled by a factor of 20
+* Error ellipses (red) are 1-sigma and scaled by a factor of 20.
 ![Rudimentary PIV](rudimentaryPIV.png)
