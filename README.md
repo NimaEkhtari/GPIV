@@ -16,9 +16,21 @@ I'm not sure this is even in Beta stage yet. The PIV and error propagation works
 Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors. And somewhere in the midst of this I need to figure out how to package this sucker so users can do a `conda install gpiv` or similar.
 
 ## Usage
-* Type `python gpiv.py --help` to see usage. 
+### Dependences
+Since this is not packaged yet, you will need to install the following dependencies into a new environment:
+
+* docopt
+* rasterio
+* numpy
+* shapely
+* scikit-image
+* matplotlib
+* pdal
+
+### Command Line
+* Type `python gpiv.py --help` to see available commands and options. 
 * You will notice a lot of 'from' and 'to' verbiage. 'From' indicates the older data, whereas 'to' indicates the newer data. The vectors will point from the older data to the newer data. 
-* GPIV stores rasters in geotiff format in the working directory (which is gpiv/gpiv for now since we are working with the source files, i.e., this is not at package install) with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well. Don't rename the files since GPIV relies on their given names. Copy them to a new place if you want to save a particular version.
+* GPIV stores rasters in geotiff format in the working directory (which is gpiv/gpiv for now since we are working with the source files, i.e., this is not at package install) with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well. Don't rename the files since GPIV relies on their given names. Copy them to a new place if you want to save a particular version of the results.
 
 ## Rudimentary Example
 * Canada glacier.
