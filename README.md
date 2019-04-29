@@ -16,7 +16,7 @@ I'm not sure this is even in Beta stage yet. The PIV and error propagation works
 Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors. And somewhere in the midst of this I need to figure out how to package this sucker so users can do a `conda install gpiv` or similar.
 
 ## Usage
-### Dependences
+### Dependencies
 Since this is not packaged yet, you will need to install the following dependencies into a new environment:
 
 * docopt
