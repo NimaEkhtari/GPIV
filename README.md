@@ -13,12 +13,12 @@ The error raster that GPIV currently produces when rasterizing a lidar point clo
 ## Status
 I'm not sure this is even in Beta stage yet. The PIV and error propagation works, but the PIV is very basic (single pass, no window deformation) and the error propagation is slooow. There are no tests yet.
 
-Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors.
+Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors. And somewhere in the midst of this I need to figure out how to package this sucker so users can do a `conda install gpiv` or similar.
 
 ## Usage
 * Type `python gpiv.py --help` to see usage. 
 * You will notice a lot of 'from' and 'to' verbiage. 'From' indicates the older data, whereas 'to' indicates the newer data. The vectors will point from the older data to the newer data. 
-* GPIV stores rasters in geotiff format in the working directory with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well. Don't rename the files; GPIV relies on their given names. Copy them to a new place if you want to save a particular version.
+* GPIV stores rasters in geotiff format in the working directory (which is gpiv/gpiv for now since we are working with the source files, i.e., this is not at package install) with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well. Don't rename the files since GPIV relies on their given names. Copy them to a new place if you want to save a particular version.
 
 ## Rudimentary Example
 * Canada glacier.

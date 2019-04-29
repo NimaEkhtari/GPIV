@@ -18,10 +18,10 @@ Options:
 '''
 
 from docopt import docopt
-from .raster_option import create_rasters
+from raster_option import create_rasters
 # import .polygon_option
-from .piv_option import  piv
-from .show_option import show
+from piv_option import  piv
+from show_option import show
 import os
 import sys
 import rasterio
@@ -38,7 +38,7 @@ def is_positive_number(n):
 	return True
 
 
-def main():
+if __name__ == '__main__':
 	arguments = docopt(__doc__)
 
 	if arguments['raster']: 
@@ -116,6 +116,3 @@ def main():
 		     arguments['--height'], arguments['--error'],
 			 arguments['--vectors'], arguments['<vectorScaleFactor>'],
 			 arguments['--ellipses'], arguments['<ellipseScaleFactor>'])
-
-if __name__ == '__main__':
-	main()
