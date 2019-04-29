@@ -2,19 +2,19 @@
 gpiv
 
 Usage:
-  gpiv raster <lasFile> <rasterSize> (--from | --to)
-  gpiv piv <templateSize> <stepSize> [--propagate]
-  gpiv show (--from | --to) (--height | --error) [(--vectors <vectorScaleFactor>)] [(--ellipses <ellipseScaleFactor>)]
+	gpiv.py raster <lasFile> <rasterSize> (--from | --to)
+	gpiv.py piv <templateSize> <stepSize> [--propagate]
+	gpiv.py show (--from | --to) (--height | --error) [(--vectors <vectorScaleFactor>)] [(--ellipses <ellipseScaleFactor>)]
 
 Options:
-  --help          Show this screen.
-  --propagate     Propagate raster error.
-  --from          'From' data.
-  --to            'To' data.
-  --height        Height data.
-  --error         Error data.
-  --vectors       Show PIV displacement vectors. You must supply a scale factor.
-  --ellipses      Show propagated PIV displacement uncertainty ellipses. You must supply a scale factor.
+	--help          Show this screen.
+	--propagate     Propagate raster error.
+	--from          'From' data.
+	--to            'To' data.
+	--height        Height data.
+	--error         Error data.
+	--vectors       Show PIV displacement vectors. You must supply a scale factor.
+	--ellipses      Show propagated PIV displacement uncertainty ellipses. You must supply a scale factor.
 '''
 
 from docopt import docopt
