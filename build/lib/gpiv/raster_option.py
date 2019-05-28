@@ -2,7 +2,7 @@ import pdal
 import json
 import math
 import rasterio
-from show_option import show
+from .show_option import show
 
 
 def clean_multiple(num, multiple, direction):

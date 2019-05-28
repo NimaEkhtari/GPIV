@@ -2,3 +2,5 @@
 *.tif
 *.jpg
 *.pyc
+/dist/
+/*.egg-info

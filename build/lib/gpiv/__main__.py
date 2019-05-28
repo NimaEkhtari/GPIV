@@ -2,26 +2,26 @@
 gpiv
 
 Usage:
-	gpiv.py raster <lasFile> <rasterSize> (--from | --to)
-	gpiv.py piv <templateSize> <stepSize> [--propagate]
-	gpiv.py show (--from | --to) (--height | --error) [(--vectors <vectorScaleFactor>)] [(--ellipses <ellipseScaleFactor>)]
+  gpiv raster <lasFile> <rasterSize> (--from | --to)
+  gpiv piv <templateSize> <stepSize> [--propagate]
+  gpiv show (--from | --to) (--height | --error) [(--vectors <vectorScaleFactor>)] [(--ellipses <ellipseScaleFactor>)]
 
 Options:
-	--help          Show this screen.
-	--propagate     Propagate raster error.
-	--from          'From' data.
-	--to            'To' data.
-	--height        Height data.
-	--error         Error data.
-	--vectors       Show PIV displacement vectors. You must supply a scale factor.
-	--ellipses      Show propagated PIV displacement uncertainty ellipses. You must supply a scale factor.
+  --help          Show this screen.
+  --propagate     Propagate raster error.
+  --from          'From' data.
+  --to            'To' data.
+  --height        Height data.
+  --error         Error data.
+  --vectors       Show PIV displacement vectors. You must supply a scale factor.
+  --ellipses      Show propagated PIV displacement uncertainty ellipses. You must supply a scale factor.
 '''
 
 from docopt import docopt
-from raster_option import create_rasters
+from .raster_option import create_rasters
 # import .polygon_option
-from piv_option import  piv
-from show_option import show
+from .piv_option import  piv
+from .show_option import show
 import os
 import sys
 import rasterio
@@ -38,7 +38,7 @@ def is_positive_number(n):
 	return True
 
 
-if __name__ == '__main__':
+def main():
 	arguments = docopt(__doc__)
 
 	if arguments['raster']: 
@@ -116,3 +116,6 @@ if __name__ == '__main__':
 		     arguments['--height'], arguments['--error'],
 			 arguments['--vectors'], arguments['<vectorScaleFactor>'],
 			 arguments['--ellipses'], arguments['<ellipseScaleFactor>'])
+
+if __name__ == '__main__':
+	main()

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as pch
 import time
 import json
-from show_option import show
+from .show_option import show
 
 
 def piv(templateSize, stepSize, propFlag):
