@@ -10,6 +10,7 @@ import matplotlib.patches as pch
 import time
 import json
 from show_option import show
+import time
 
 
 def piv(templateSize, stepSize, propFlag):
@@ -35,6 +36,7 @@ def piv(templateSize, stepSize, propFlag):
     ax2 = plt.subplot(1, 2, 2)
     for i in range(vCount):
         for j in range(uCount):
+            t00 = time.time()
 
             # get template area data from the 'from' height and error images
             templateStartU = int(j*stepSize + math.ceil(templateSize/2))
@@ -85,12 +87,15 @@ def piv(templateSize, stepSize, propFlag):
             # propagate error if requested
             if propFlag:
                 # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
+                t0 = time.time()
                 nccCov = prop_px2corr(templateHeight,
                                       templateError, 
                                       searchHeight[nccMax[0][0]-1:nccMax[0][0]+templateSize+1, nccMax[1][0]-1:nccMax[1][0]+templateSize+1], # templateSize+2 x templateSize+2 subarray of the search array,
                                       searchError[nccMax[0][0]-1:nccMax[0][0]+templateSize+1, nccMax[1][0]-1:nccMax[1][0]+templateSize+1], # templateSize+2 x templateSize+2 subarray of the search error array
                                       ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2], # 3x3 array of correlation values centered on the correlation peak
                                       p) 
+                t1 = time.time()
+                print("prop time={}".format(t1-t0))
 
                 # propagate the correlation covariance into the sub-pixel peak location
                 peakCov = prop_corr2peak(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2],
@@ -105,7 +110,11 @@ def piv(templateSize, stepSize, propFlag):
                 peakCov[1][1] *= transform[0]*transform[0]
 
                 # store for json output; we convert to a list here for simple json output
-                subPxPeakCov.append(peakCov.tolist())    
+                subPxPeakCov.append(peakCov.tolist())   
+
+            t11 = time.time()
+            print("total time={}".format(t11-t00))
+
 
     # convert vector origins and offsets from pixels to ground distance json file
     originUV = np.squeeze(originUV)        
@@ -180,11 +189,17 @@ def ncc_jacobian(template, search, ncc, p):
     sRow, sCol = search.shape
     jacobian = np.zeros((9, template.size + search.size))
 
+    sz = template.size
+    print(sz)
+    templateN = (template - np.mean(template)) / (np.std(template))
+
     # cycle through the 3x3 correlation array, row-by-row
     for i in range(3): # rows
         for j in range(3): # columns
             # pull out the sub-area of the search patch
             searchSub = search[i:i+tRow, j:j+tCol]
+
+            searchSubN = (searchSub - np.mean(searchSub)) / (np.std(searchSub))
             
             # preallocate arrays to store the template and search partial derivates
             templatePartials = np.zeros((tRow, tCol))
@@ -200,8 +215,12 @@ def ncc_jacobian(template, search, ncc, p):
                     searchSubPerturb[m,n] += p
 
                     # compute perturbed ncc
-                    nccTemplatePerturb = match_template(templatePerturb, searchSub)
-                    nccSearchPerturb = match_template(template, searchSubPerturb)
+                    # nccTemplatePerturb = match_template(templatePerturb, searchSub)
+                    # nccSearchPerturb = match_template(template, searchSubPerturb)
+                    templatePerturbN = (templatePerturb - np.mean(templatePerturb)) / (np.std(templatePerturb) * sz)
+                    searchSubPerturbN = (searchSubPerturb - np.mean(searchSubPerturb)) / (np.std(searchSubPerturb) * sz)
+                    nccTemplatePerturb = np.sum(templatePerturbN * searchSubN)
+                    nccSearchPerturb = np.sum(templateN * searchSubPerturbN)
                     
                     # numeric partial derivatives
                     templatePartials[m,n] = (nccTemplatePerturb - ncc[i,j]) / p
