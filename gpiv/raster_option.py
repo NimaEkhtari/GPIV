@@ -78,7 +78,9 @@ def create_rasters(lasFile, rasterSize, f, t):
                 "resolution": rasterSize,
                 "radius": rasterRadius,
                 "bounds": bounds,
-                "filename": rasterFileName
+                "filename": rasterFileName,
+                "window_size":5,
+                "nodata":0
             }
         ]
     }

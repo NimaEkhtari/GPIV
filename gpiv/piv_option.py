@@ -58,12 +58,12 @@ def piv(templateSize, stepSize, propFlag):
             plt.cla()
             ax1.set_title('FROM')
             ax1.imshow(fromHeight, cmap=plt.cm.gray)
-            ax1.add_patch(pch.Rectangle((templateStartU,templateEndV), templateSize-1, templateSize-1, linewidth=1, edgecolor='r',fill=None))
+            ax1.add_patch(pch.Rectangle((templateStartU,templateStartV), templateSize-1, templateSize-1, linewidth=1, edgecolor='r',fill=None))
             plt.sca(ax2)
             plt.cla()
             ax2.set_title('TO')            
             ax2.imshow(toHeight, cmap=plt.cm.gray)            
-            ax2.add_patch(pch.Rectangle((searchStartU,searchEndV), searchSize-1, searchSize-1, linewidth=1, edgecolor='r',fill=None))
+            ax2.add_patch(pch.Rectangle((searchStartU,searchStartV), searchSize-1, searchSize-1, linewidth=1, edgecolor='r',fill=None))
             plt.pause(0.01)        
 
             # move to next area if the template is flat, which breaks the correlation computation
@@ -117,11 +117,11 @@ def piv(templateSize, stepSize, propFlag):
 
 
     # convert vector origins and offsets from pixels to ground distance json file
-    originUV = np.squeeze(originUV)        
+    originUV = np.asarray(originUV)      
     originUV *= transform[0] # scale by pixel ground size
     originUV[:,0] += transform[2] # offset U by leftmost pixel to get ground coordinate
     originUV[:,1] = transform[5] - originUV[:,1] # subtract V from uppermost pixel to get ground coordinate
-    offsetUV = np.squeeze(offsetUV)
+    offsetUV = np.asarray(offsetUV)
     offsetUV *= transform[0] # scale by pixel ground size
 
     # export vector origins and offsets to json
@@ -215,8 +215,21 @@ def ncc_jacobian(template, search, ncc, p):
                     searchSubPerturb[m,n] += p
 
                     # compute perturbed ncc
+                    # Original Method
                     # nccTemplatePerturb = match_template(templatePerturb, searchSub)
                     # nccSearchPerturb = match_template(template, searchSubPerturb)
+                    # Potential Method that may catch the NaN generation
+                    # templatePerturbStd = np.std(templatePerturb)
+                    # searchSubPerturbStd = np.std(searchSubPerturb)
+                    # if templatePerturbStd:
+                    #     templatePerturbN = (templatePerturb - np.mean(templatePerturb)) / (templatePerturbStd * sz)
+                    # else:
+                    #     templatePerturbN = 0
+                    # if searchSubPerturbStd:
+                    #     searchSubPerturbN = (searchSubPerturb - np.mean(searchSubPerturb)) / (searchSubPerturbStd * sz)
+                    # else:
+                    #     searchSubPerturbN = 0
+                    # Current Method that is 20x faster than original method
                     templatePerturbN = (templatePerturb - np.mean(templatePerturb)) / (np.std(templatePerturb) * sz)
                     searchSubPerturbN = (searchSubPerturb - np.mean(searchSubPerturb)) / (np.std(searchSubPerturb) * sz)
                     nccTemplatePerturb = np.sum(templatePerturbN * searchSubN)
