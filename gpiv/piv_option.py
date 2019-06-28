@@ -70,8 +70,12 @@ def piv(templateSize, stepSize, propFlag):
             if ((templateHeight.max() - templateHeight.min()) == 0):
                 continue
             
-            # normalized cross correlation between the template and search area height data            
+            # normalized cross correlation between the template and search area height data - fast, but based on FFT          
             ncc = match_template(searchHeight, templateHeight)
+            # normalized cross correlation between the template and search area height data - slower, but is pure spatial ncc (not FFT-based) 
+            ncc = ncc_running_sums(searchHeight, templateHeight)
+
+            # maximum in the ncc surface
             nccMax = np.where(ncc == np.amax(ncc))
 
             # sub-pixel peak location
@@ -117,7 +121,7 @@ def piv(templateSize, stepSize, propFlag):
 
 
     # convert vector origins and offsets from pixels to ground distance json file
-    originUV = np.asarray(originUV)      
+    originUV = np.asarray(originUV)        
     originUV *= transform[0] # scale by pixel ground size
     originUV[:,0] += transform[2] # offset U by leftmost pixel to get ground coordinate
     originUV[:,1] = transform[5] - originUV[:,1] # subtract V from uppermost pixel to get ground coordinate
@@ -214,10 +218,10 @@ def ncc_jacobian(template, search, ncc, p):
                     searchSubPerturb = searchSub.copy()
                     searchSubPerturb[m,n] += p
 
-                    # compute perturbed ncc
-                    # Original Method
+                    # compute perturbed ncc - prior method that is much slower
                     # nccTemplatePerturb = match_template(templatePerturb, searchSub)
                     # nccSearchPerturb = match_template(template, searchSubPerturb)
+
                     # Potential Method that may catch the NaN generation
                     # templatePerturbStd = np.std(templatePerturb)
                     # searchSubPerturbStd = np.std(searchSubPerturb)
@@ -229,7 +233,8 @@ def ncc_jacobian(template, search, ncc, p):
                     #     searchSubPerturbN = (searchSubPerturb - np.mean(searchSubPerturb)) / (searchSubPerturbStd * sz)
                     # else:
                     #     searchSubPerturbN = 0
-                    # Current Method that is 20x faster than original method
+
+                    # compute perturbed ncc - brute force method that is about 20x faster than using skimage's match_template
                     templatePerturbN = (templatePerturb - np.mean(templatePerturb)) / (np.std(templatePerturb) * sz)
                     searchSubPerturbN = (searchSubPerturb - np.mean(searchSubPerturb)) / (np.std(searchSubPerturb) * sz)
                     nccTemplatePerturb = np.sum(templatePerturbN * searchSubN)
@@ -310,4 +315,23 @@ def subpx_peak_taylor(ncc):
     return [delX, delY] # delX is left-to-right; delY is top-to-bottom; note that delX == delU and delY == delV
 
 
+def ncc_running_sums(search, template):
+    s = np.zeros((search.shape[0]+1, search.shape[1]+1))
+    s2 = s.copy()
+    for u in range(1,search.shape[1]+1): # columns
+        for v in range(1,search.shape[0]+1): # rows
+            s[u,v] = search[u-1,v-1] + s[u-1,v] + s[u,v-1] - s[u-1,v-1]
+            s2[u,v] = search[u-1,v-1]**2 + s2[u-1,v] + s2[u,v-1] - s2[u-1,v-1]
 
+    templateZeroMean = template  - np.mean(template)
+    templateZeroMeanSquareSum = np.sum(templateZeroMean**2)
+    N = template.shape[0]
+    M = search.shape[0]
+
+    ncc = np.zeros((M-N+1,M-N+1))
+    for u in range(M-N+1):
+        for v in range (M-N+1):
+            searchSum = s[u+N,v+N] - s[u,v+N] - s[u+N,v] + s[u,v]
+            numerator = np.sum(search[u:u+N,v:v+N] * templateZeroMean)
+            denominator = np.sqrt(((s2[u+N,v+N] - s2[u,v+N] - s2[u+N,v] + s2[u,v]) - searchSum**2 / (N*N)) * templateZeroMeanSquareSum)
+            ncc[u,v] = numerator / denominator

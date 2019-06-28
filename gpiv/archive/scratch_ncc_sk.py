@@ -5,23 +5,23 @@ import json
 from skimage.feature import match_template
 import time
 
-tptSize = 32
+tptSize = 128
 rowStart = 400
 colStart = 400
 
 # image and template
 fromHeight, fromError, toHeight, toError, transform = get_image_arrays()
-tpt = fromHeight[rowStart+1:rowStart+1+tptSize,colStart+1:colStart+1+tptSize]
-img = toHeight[rowStart:rowStart+tptSize+2,colStart:colStart+tptSize+2]
-# tpt = fromHeight[int(rowStart+tptSize*0.5):int(rowStart+tptSize*1.5),int(colStart+tptSize*0.5):int(colStart+tptSize*1.5)]
-# img = toHeight[rowStart:rowStart+tptSize*2,colStart:colStart+tptSize*2]
+# tpt = fromHeight[rowStart+1:rowStart+1+tptSize,colStart+1:colStart+1+tptSize]
+# img = toHeight[rowStart:rowStart+tptSize+2,colStart:colStart+tptSize+2]
+tpt = fromHeight[int(rowStart+tptSize*0.5):int(rowStart+tptSize*1.5),int(colStart+tptSize*0.5):int(colStart+tptSize*1.5)]
+img = toHeight[rowStart:rowStart+tptSize*2,colStart:colStart+tptSize*2]
 
 
 ################
 # skimage ncc
 ################
 t0 = time.time()
-for i in range(1000):
+for i in range(100):
     nccSK = match_template(img, tpt)
 
 t1 = time.time()
