@@ -73,7 +73,7 @@ def piv(templateSize, stepSize, propFlag):
             # normalized cross correlation between the template and search area height data - fast, but based on FFT          
             ncc = match_template(searchHeight, templateHeight)
             # normalized cross correlation between the template and search area height data - slower, but is pure spatial ncc (not FFT-based) 
-            ncc = ncc_running_sums(searchHeight, templateHeight)
+            # ncc = ncc_running_sums(searchHeight, templateHeight)
 
             # maximum in the ncc surface
             nccMax = np.where(ncc == np.amax(ncc))
@@ -151,10 +151,9 @@ def piv(templateSize, stepSize, propFlag):
 
 
 def vec_ellipse_scales(offsetUV, subPxPeakCov, maxImgDim, propFlag):
-    # generate vector scale factor such that the median vector displacement magnitude is 1/30 the maximum image dimension
-    vecNorms = np.linalg.norm(offsetUV, axis=1)
-    medianVecNorm = np.median(vecNorms)
-    vecSF = (maxImgDim / 30) / medianVecNorm
+    # Original code deleted. Now handled by the "show" module, which does a better job
+    # The ellipse scale factor will also need to be moved to the "show" module
+    vecSF = 1
 
     # generate ellipse scale factor such that the median semimajor axis magnitude is 1/45 the maximum image dimension
     if propFlag:

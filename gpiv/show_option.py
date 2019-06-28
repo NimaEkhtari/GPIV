@@ -9,12 +9,12 @@ import math
 
 def show(f, t, h, e, vec, vecSF, ell, ellSF):
     # open the requested raster and plot
-    ax, tm = plot_raster(f, t, h, e)
+    fig, ax, geoWidth = plot_raster(f, t, h, e)
 
     # open vectors and plot if requested
     if vec:
         vecSF = float(vecSF)
-        plot_vectors(ax, tm, vecSF)
+        plot_vectors(fig, ax, geoWidth, vecSF)
 
     # open ellipses and plot if requested
     if ell:
@@ -25,19 +25,24 @@ def show(f, t, h, e, vec, vecSF, ell, ellSF):
     plt.show()
 
 
-def plot_vectors(ax, tm, vecSF):
+def plot_vectors(fig, ax, geoWidth, vecSF):
+    bbox = ax.get_window_extent()
+    pxWidth = bbox.width
+    pxPerGeo = pxWidth / geoWidth
+
     with open('piv_origins_offsets.json') as jsonFile:
         d = json.load(jsonFile)
     
-    # nominal vector lenght scale factor
+    # nominal vector length scale factor
     dn = np.asarray(d)
-    vecLen = np.linalg.norm(dn[:,2:], axis=1) / tm[0] # convert to pixels
-    nomVecSF = 5/np.median(vecLen) # scale factor to convert median vector length to 5 pixels
+    vecLen = np.linalg.norm(dn[:,2:], axis=1) * pxPerGeo # convert to pixels
+    nomVecSF = 15 / np.median(vecLen) # scale factor to convert median vector length to 15 pixels
+    nomHeadSF = 7 / pxPerGeo
         
     for i in range(len(d)):
         # add arrow with base at vector origin
         a = patch.FancyArrow(d[i][0], d[i][1], d[i][2]*nomVecSF*vecSF, -d[i][3]*nomVecSF*vecSF, # the negative sign converts from dV (postive down) to dY (positive up)
-                            length_includes_head=True, head_width=vecSF*1, head_length=vecSF*1, overhang=0.8, fc='green', ec='green')
+                            length_includes_head=True, head_width=nomHeadSF*vecSF, overhang=0.8, fc='green', ec='green')
         ax.add_artist(a)
 
 
@@ -85,15 +90,17 @@ def plot_raster(f, t, h, e):
                 plotLRBT = list(rasterio.plot.plotting_extent(src)) 
             plotTitle = 'To (error)'
 
-    tm = src.transform
+    # tm = src.transform
     src.close()
     plotMin = min(np.percentile(plotRaster.compressed(), 1), np.percentile(plotRaster.compressed(), 1))
     plotMax = max(np.percentile(plotRaster.compressed(), 99), np.percentile(plotRaster.compressed(), 99))
+    fig = plt.figure()
     ax = plt.gca()
     plt.imshow(plotRaster, cmap=plt.cm.gray, extent=plotLRBT,vmin=plotMin,vmax=plotMax)
     ax.set_title(plotTitle)
+    geoWidth = plotLRBT[1] - plotLRBT[0]
 
-    return ax, tm
+    return fig, ax, geoWidth
 
 
 
