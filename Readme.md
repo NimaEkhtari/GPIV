@@ -17,15 +17,7 @@ Next steps in development will be validating the error propagation on synthetic 
 
 ## Usage
 ### Dependencies
-Since this is not packaged yet, you will need to install the following dependencies into a new environment:
-
-* docopt
-* rasterio
-* numpy
-* shapely
-* scikit-image
-* matplotlib
-* pdal
+Use the `environment.yml` file to create a new environment with all the dependencies: `conda env create -f  environment.yml`.
 
 ### Command Line
 * Type `python gpiv.py --help` to see available commands and options. 

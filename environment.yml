@@ -2,6 +2,8 @@ name: gpiv
 channels:
   - conda-forge
   - defaults
+  - conda-forge/label/broken
+  - conda-forge/label/cf201901
 dependencies:
   - affine=2.2.2=py37_0
   - attrs=19.1.0=py37_1
