@@ -20,7 +20,7 @@ def piv(templateSize, stepSize, propFlag):
         subPxPeakCov = []
 
     # get image arrays of common (overlapping) area
-    fromHeight, fromError, toHeight, toError, transform = get_image_arrays()
+    fromHeight, fromError, toHeight, toError, transform = get_image_arrays(propFlag)
 
     # determine number of search areas in horizontal (u) and vertical (v)
     searchSize = templateSize*2
@@ -44,14 +44,13 @@ def piv(templateSize, stepSize, propFlag):
             templateStartV = int(i*stepSize + math.ceil(templateSize/2))
             templateEndV = int(i*stepSize + math.ceil(templateSize/2) + templateSize)
             templateHeight = fromHeight[templateStartV:templateEndV, templateStartU:templateEndU].copy()
-            templateError = fromError[templateStartV:templateEndV, templateStartU:templateEndU].copy()
+            
             # get search area data from the 'to' height and error images
             searchStartU = int(j*stepSize)
             searchEndU = int(j*stepSize + searchSize + (templateSize % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
             searchStartV = int(i*stepSize)
             searchEndV = int(i*stepSize + searchSize + (templateSize % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
-            searchHeight = toHeight[searchStartV:searchEndV, searchStartU:searchEndU].copy()
-            searchError = toError[searchStartV:searchEndV, searchStartU:searchEndU].copy()    
+            searchHeight = toHeight[searchStartV:searchEndV, searchStartU:searchEndU].copy()            
 
             # show template and search patches on 'from' and 'to' images for visual progress indication
             plt.sca(ax1)
@@ -90,6 +89,10 @@ def piv(templateSize, stepSize, propFlag):
 
             # propagate error if requested
             if propFlag:
+                # get template and search areas from the 'from' and 'to' error images
+                templateError = fromError[templateStartV:templateEndV, templateStartU:templateEndU].copy()
+                searchError = toError[searchStartV:searchEndV, searchStartU:searchEndU].copy()    
+
                 # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
                 t0 = time.time()
                 nccCov = prop_px2corr(templateHeight,
@@ -269,17 +272,22 @@ def prop_corr2peak(ncc, nccCov, deltaUV, p):
     return subPxPeakCov
 
 
-def get_image_arrays():    
-    # read in the 'from' and 'to' images as numpy arrays (currently assumes multiple layers in the from and to image files)
-    fromRaster = rasterio.open('from.tif')
-    toRaster = rasterio.open('to.tif')
+def get_image_arrays(propFlag):    
+    # read in the 'from' and 'to' height images as numpy arrays 
+    fromHeight = rasterio.open('fromHeight.tif')
+    toHeight = rasterio.open('toHeight.tif')
+    
+    # if propagating error, read in the 'from' and 'to' error images as numpy arrays
+    if propFlag:
+        fromError = rasterio.open('fromError.tif')
+        toError = rasterio.open('toError.tif')
 
-    # get the raster geometric transformation
-    transform = fromRaster.transform
+    # get the raster geometric transformation - assumes from and to height images have same transform
+    transform = fromHeight.transform
     
     # create a polygon defining the extents of the geospatial overlap
-    fromLRBT = list(rasterio.plot.plotting_extent(fromRaster)) # LRBT = [left, right, bottom, top]
-    toLRBT = list(rasterio.plot.plotting_extent(toRaster))
+    fromLRBT = list(rasterio.plot.plotting_extent(fromHeight)) # LRBT = [left, right, bottom, top]
+    toLRBT = list(rasterio.plot.plotting_extent(toHeight))
     extentsLRBT = list()
     extentsLRBT.append(max(fromLRBT[0], toLRBT[0]))
     extentsLRBT.append(min(fromLRBT[1], toLRBT[1]))
@@ -293,10 +301,15 @@ def get_image_arrays():
     bpoly = geometry.Polygon(bbox)
     
     # crop from and to images to bounding box
-    fromHeightCropped, t = rasterio.mask.mask(fromRaster, [bpoly], crop=True, nodata=0, indexes=3)
-    fromErrorCropped, t = rasterio.mask.mask(fromRaster, [bpoly], crop=True, nodata=0, indexes=6)
-    toHeightCropped, t = rasterio.mask.mask(toRaster, [bpoly], crop=True, nodata=0, indexes=3)
-    toErrorCropped, t = rasterio.mask.mask(toRaster, [bpoly], crop=True, nodata=0, indexes=6)
+    fromHeightCropped, t = rasterio.mask.mask(fromHeight, [bpoly], crop=True, nodata=0, indexes=1)
+    toHeightCropped, t = rasterio.mask.mask(toHeight, [bpoly], crop=True, nodata=0, indexes=1)
+
+    if propFlag:
+        fromErrorCropped, t = rasterio.mask.mask(fromError, [bpoly], crop=True, nodata=0, indexes=1)
+        toErrorCropped, t = rasterio.mask.mask(toError, [bpoly], crop=True, nodata=0, indexes=1)
+    else:
+        fromErrorCropped = []
+        toErrorCropped = []
 
     return fromHeightCropped, fromErrorCropped, toHeightCropped, toErrorCropped, transform
 

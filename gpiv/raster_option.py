@@ -2,6 +2,7 @@ import pdal
 import json
 import math
 import rasterio
+import os
 from show_option import show
 
 
@@ -100,6 +101,9 @@ def create_rasters(lasFile, rasterSize, f, t):
         dst.write(heightRaster, 1)
     with rasterio.open(errorFileName, 'w', **profile) as dst:
         dst.write(errorRaster, 1)
+    
+    # delete the now redundant tif file created by pdal
+    os.remove(rasterFileName)
 
     # display the height and error rasters
     show(f, t, True, False, False, [], False, [])
