@@ -13,7 +13,7 @@ The error raster that GPIV currently produces when rasterizing a lidar point clo
 ## Status
 I'm not sure this is even in Beta stage yet. The PIV and error propagation works, but the PIV is very basic (single pass, no window deformation) and the error propagation is slooow. There are no tests yet.
 
-Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors. And somewhere in the midst of this I need to figure out how to package this sucker so users can do a `conda install gpiv` or similar.
+Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors. And somewhere in the midst of this I need to figure out how to package this sucker so users can do a `conda install gpiv` or similar. Also need to standardize things to PEP8.
 
 ## Usage
 ### Dependencies

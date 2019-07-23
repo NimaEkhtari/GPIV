@@ -16,7 +16,7 @@ import time
 def piv(templateSize, stepSize, propFlag):
     # set perturbation value for numeric partial derivatives
     if propFlag:
-        p = 0.0000001
+        p = 0.000001
         subPxPeakCov = []
 
     # get image arrays of common (overlapping) area
@@ -76,19 +76,13 @@ def piv(templateSize, stepSize, propFlag):
 
             # maximum in the ncc surface
             nccMax = np.where(ncc == np.amax(ncc))
-            # print(nccMax)
-
-            # fig = plt.figure()
-            # ax = plt.gca()
-            # plt.imshow(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2], cmap=plt.cm.gray)
-            # ax.set_title('Max X = {}, Max Y = {}'.format(nccMax[0][0], nccMax[1][0]))
 
             # sub-pixel peak location
             if nccMax[0][0]==0 or nccMax[1][0]==0 or nccMax[0][0]==ncc.shape[0]-1 or nccMax[1][0]==ncc.shape[1]-1: # the subpixel interpolator can not handle peak locations on the edges of the correlation matrix
                 continue
             else:
+                print(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2])
                 subPxPeak = subpx_peak_taylor(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2])
-                # print(subPxPeak)
                     
             # store vector origin and end points            
             originUV.append(((j*stepSize + templateSize - (1 - templateSize % 2)*0.5), (i*stepSize + templateSize - (1 - templateSize % 2)*0.5))) # the expression containing the modulo operator adjusts even-sized template origins to be between pixel centers
@@ -319,19 +313,18 @@ def get_image_arrays(propFlag):
     
     # crop from and to images to bounding box
     fromHeightCropped, t = rasterio.mask.mask(fromHeight, [bpoly], crop=True, nodata=0, indexes=1)
+    fromHeightCropped = fromHeightCropped.astype('float64')
     toHeightCropped, t = rasterio.mask.mask(toHeight, [bpoly], crop=True, nodata=0, indexes=1)
+    toHeightCropped = toHeightCropped.astype('float64')
 
     if propFlag:
         fromErrorCropped, t = rasterio.mask.mask(fromError, [bpoly], crop=True, nodata=0, indexes=1)
+        fromErrorCropped = fromHeightCropped.astype('float64')
         toErrorCropped, t = rasterio.mask.mask(toError, [bpoly], crop=True, nodata=0, indexes=1)
+        toErrorCropped = toErrorCropped.astype('float64')
     else:
         fromErrorCropped = []
         toErrorCropped = []
-
-    fromHeightCropped = fromHeightCropped.astype('float64')
-    fromErrorCroopped = fromHeightCropped.astype('float64')
-    toHeightCropped = toHeightCropped.astype('float64')
-    toErrorCropped = toErrorCropped.astype('float64')
 
     return fromHeightCropped, fromErrorCropped, toHeightCropped, toErrorCropped, transform
 
