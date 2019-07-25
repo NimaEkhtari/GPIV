@@ -13,56 +13,69 @@ from show_option import show
 import time
 
 
-def piv(templateSize, stepSize, propFlag):
-    # set perturbation value for numeric partial derivatives
-    if propFlag:
-        p = 0.000001
-        subPxPeakCov = []
+def piv(template_sz, step_sz, prop_flag):
+    if prop_flag:
+        p = 0.000001  # Perturbation value for numeric partial derivatives
+        sub_px_peak_cov = []
 
-    # get image arrays of common (overlapping) area
-    fromHeight, fromError, toHeight, toError, transform = get_image_arrays(propFlag)
+    from_height, from_error, to_height, to_error, transform = get_image_arrays(
+        prop_flag)
 
-    # determine number of search areas in horizontal (u) and vertical (v)
-    searchSize = templateSize*2
-    imageShape = fromHeight.shape # [height (rows), width (columns)]
-    uCount = math.floor((imageShape[1]-searchSize) / stepSize)
-    vCount = math.floor((imageShape[0]-searchSize) / stepSize)
+    # Number of search areas in horizontal (u) and vertical (v)
+    search_sz = template_sz * 2
+    img_shape = from_height.shape
+    # u_count = math.floor((img_shape[1]-search_sz) / step_sz)
+    # v_count = math.floor((img_shape[0]-search_sz) / step_sz)
+    u_count = math.floor((img_shape[1]) / step_sz)
+    v_count = math.floor((img_shape[0]) / step_sz)
 
     # cycle through each set of search and template areas
-    originUV = []
-    offsetUV = []
+    origin_uv = []
+    offset_uv = []
     fig = plt.figure()
     ax1 = plt.subplot(1, 2, 1)
     ax2 = plt.subplot(1, 2, 2)
-    for i in range(vCount):
-        for j in range(uCount):
+    for i in range(v_count):
+        for j in range(u_count):
             # t00 = time.time()
 
             # get template area data from the 'from' height and error images
-            templateStartU = int(j*stepSize + math.ceil(templateSize/2))
-            templateEndU = int(j*stepSize + math.ceil(templateSize/2) + templateSize)
-            templateStartV = int(i*stepSize + math.ceil(templateSize/2))
-            templateEndV = int(i*stepSize + math.ceil(templateSize/2) + templateSize)
-            templateHeight = fromHeight[templateStartV:templateEndV, templateStartU:templateEndU].copy()
+            templateStartU = int(
+                j*step_sz 
+                + math.ceil(template_sz/2))
+            templateEndU = int(
+                j*step_sz 
+                + math.ceil(template_sz/2) 
+                + template_sz)
+            templateStartV = int(
+                i*step_sz 
+                + math.ceil(template_sz/2))
+            templateEndV = int(
+                i*step_sz 
+                + math.ceil(template_sz/2) 
+                + template_sz)
+            templateHeight = from_height[
+                templateStartV:templateEndV,templateStartU:templateEndU].copy()
             
-            # get search area data from the 'to' height and error images
-            searchStartU = int(j*stepSize)
-            searchEndU = int(j*stepSize + searchSize + (templateSize % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
-            searchStartV = int(i*stepSize)
-            searchEndV = int(i*stepSize + searchSize + (templateSize % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
-            searchHeight = toHeight[searchStartV:searchEndV, searchStartU:searchEndU].copy()            
+            # get search area data from the 'to' height and error images. 
+            searchStartU = int(j*step_sz)
+            searchEndU = int(j*step_sz + search_sz + (template_sz % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
+            searchStartV = int(i*step_sz)
+            searchEndV = int(i*step_sz + search_sz + (template_sz % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
+            searchHeight = to_height[
+                searchStartV:searchEndV,searchStartU:searchEndU].copy()            
 
             # show template and search patches on 'from' and 'to' images for visual progress indication
             plt.sca(ax1)
             plt.cla()
             ax1.set_title('FROM')
-            ax1.imshow(fromHeight, cmap=plt.cm.gray)
-            ax1.add_patch(pch.Rectangle((templateStartU,templateStartV), templateSize-1, templateSize-1, linewidth=1, edgecolor='r',fill=None))
+            ax1.imshow(from_height, cmap=plt.cm.gray)
+            ax1.add_patch(pch.Rectangle((templateStartU,templateStartV), template_sz-1, template_sz-1, linewidth=1, edgecolor='r',fill=None))
             plt.sca(ax2)
             plt.cla()
             ax2.set_title('TO')            
-            ax2.imshow(toHeight, cmap=plt.cm.gray)            
-            ax2.add_patch(pch.Rectangle((searchStartU,searchStartV), searchSize-1, searchSize-1, linewidth=1, edgecolor='r',fill=None))
+            ax2.imshow(to_height, cmap=plt.cm.gray)            
+            ax2.add_patch(pch.Rectangle((searchStartU,searchStartV), search_sz-1, search_sz-1, linewidth=1, edgecolor='r',fill=None))
             plt.pause(0.1)        
 
             # move to next area if the template is flat, which breaks the correlation computation
@@ -81,30 +94,33 @@ def piv(templateSize, stepSize, propFlag):
             if nccMax[0][0]==0 or nccMax[1][0]==0 or nccMax[0][0]==ncc.shape[0]-1 or nccMax[1][0]==ncc.shape[1]-1: # the subpixel interpolator can not handle peak locations on the edges of the correlation matrix
                 continue
             else:
-                print(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2])
                 subPxPeak = subpx_peak_taylor(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2])
-                    
+                # subPxPeak = subpx_peak_gsn(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2])
+
+            # print(nccMax)
+            # print(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2])
+
             # store vector origin and end points            
-            originUV.append(((j*stepSize + templateSize - (1 - templateSize % 2)*0.5), (i*stepSize + templateSize - (1 - templateSize % 2)*0.5))) # the expression containing the modulo operator adjusts even-sized template origins to be between pixel centers
-            offsetUV.append(((nccMax[1][0] - math.ceil(templateSize/2) + subPxPeak[0]), (nccMax[0][0] - math.ceil(templateSize/2) + subPxPeak[1])))
+            origin_uv.append(((j*step_sz + template_sz - (1 - template_sz % 2)*0.5), (i*step_sz + template_sz - (1 - template_sz % 2)*0.5))) # the expression containing the modulo operator adjusts even-sized template origins to be between pixel centers
+            offset_uv.append(((nccMax[1][0] - math.ceil(template_sz/2) + subPxPeak[0]), (nccMax[0][0] - math.ceil(template_sz/2) + subPxPeak[1])))
 
             # propagate error if requested
-            if propFlag:
+            if prop_flag:
                 # get template and search areas from the 'from' and 'to' error images
-                templateError = fromError[templateStartV:templateEndV, templateStartU:templateEndU].copy()
-                searchError = toError[searchStartV:searchEndV, searchStartU:searchEndU].copy()    
+                templateError = from_error[templateStartV:templateEndV, templateStartU:templateEndU].copy()
+                searchError = to_error[searchStartV:searchEndV, searchStartU:searchEndU].copy()    
 
                 # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
                 # t0 = time.time()
                 nccCov = prop_px2corr(templateHeight,
                                       templateError, 
-                                      searchHeight[nccMax[0][0]-1:nccMax[0][0]+templateSize+1, nccMax[1][0]-1:nccMax[1][0]+templateSize+1], # templateSize+2 x templateSize+2 subarray of the search array,
-                                      searchError[nccMax[0][0]-1:nccMax[0][0]+templateSize+1, nccMax[1][0]-1:nccMax[1][0]+templateSize+1], # templateSize+2 x templateSize+2 subarray of the search error array
+                                      searchHeight[nccMax[0][0]-1:nccMax[0][0]+template_sz+1, nccMax[1][0]-1:nccMax[1][0]+template_sz+1], # templateSize+2 x templateSize+2 subarray of the search array,
+                                      searchError[nccMax[0][0]-1:nccMax[0][0]+template_sz+1, nccMax[1][0]-1:nccMax[1][0]+template_sz+1], # templateSize+2 x templateSize+2 subarray of the search error array
                                       ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2], # 3x3 array of correlation values centered on the correlation peak
                                       p) 
                 # t1 = time.time()
                 # print("prop time={}".format(t1-t0))
-
+                # print(nccCov)
                 # propagate the correlation covariance into the sub-pixel peak location
                 peakCov = prop_corr2peak(ncc[nccMax[0][0]-1:nccMax[0][0]+2, nccMax[1][0]-1:nccMax[1][0]+2],
                                          nccCov,
@@ -118,39 +134,39 @@ def piv(templateSize, stepSize, propFlag):
                 peakCov[1][1] *= transform[0]*transform[0]
 
                 # store for json output; we convert to a list here for simple json output
-                subPxPeakCov.append(peakCov.tolist())   
+                sub_px_peak_cov.append(peakCov.tolist())   
 
             # t11 = time.time()
             # print("total time={}".format(t11-t00))
 
 
     # convert vector origins and offsets from pixels to ground distance json file
-    originUV = np.asarray(originUV)        
-    originUV *= transform[0] # scale by pixel ground size
-    originUV[:,0] += transform[2] # offset U by leftmost pixel to get ground coordinate
-    originUV[:,1] = transform[5] - originUV[:,1] # subtract V from uppermost pixel to get ground coordinate
-    offsetUV = np.asarray(offsetUV)
-    offsetUV *= transform[0] # scale by pixel ground size
+    origin_uv = np.asarray(origin_uv)        
+    origin_uv *= transform[0] # scale by pixel ground size
+    origin_uv[:,0] += transform[2] # offset U by leftmost pixel to get ground coordinate
+    origin_uv[:,1] = transform[5] - origin_uv[:,1] # subtract V from uppermost pixel to get ground coordinate
+    offset_uv = np.asarray(offset_uv)
+    offset_uv *= transform[0] # scale by pixel ground size
 
     # export vector origins and offsets to json
-    originOffset = np.concatenate((originUV, offsetUV), axis=1)
+    originOffset = np.concatenate((origin_uv, offset_uv), axis=1)
     # jsonOut = originOffset.tolist()
     json.dump(originOffset.tolist(), open("piv_origins_offsets.json", "w"))
     print("PIV vector origins and offsets saved to file 'piv_origins_offsets.json'")
 
     # export covariance matrices to json
-    if propFlag:
-        json.dump(subPxPeakCov, open("piv_covariance_matrices.json", "w"))
+    if prop_flag:
+        json.dump(sub_px_peak_cov, open("piv_covariance_matrices.json", "w"))
         print("PIV displacement covariance matrices saved to file 'piv_covariance_matrices.json'")
 
     # plot the displacement vectors on top of 'from' image 
     plt.close(fig)
-    maxImgDim = np.amax(fromHeight.shape) * transform[0]
-    if propFlag:        
-        vecSF, ellSF = vec_ellipse_scales(offsetUV, subPxPeakCov, maxImgDim, propFlag)
+    maxImgDim = np.amax(from_height.shape) * transform[0]
+    if prop_flag:        
+        vecSF, ellSF = vec_ellipse_scales(offset_uv, sub_px_peak_cov, maxImgDim, prop_flag)
         show(True, False, True, False, True, vecSF, True, ellSF)
     else:
-        vecSF, ellSF = vec_ellipse_scales(offsetUV, [], maxImgDim, propFlag)
+        vecSF, ellSF = vec_ellipse_scales(offset_uv, [], maxImgDim, prop_flag)
         show(True, False, True, False, True, vecSF, False, False)
 
 
@@ -177,15 +193,19 @@ def vec_ellipse_scales(offsetUV, subPxPeakCov, maxImgDim, propFlag):
 def prop_px2corr(template, templateError, search, searchError, ncc, p):
     # form diagonal covariance matrix from template and search patch covariance arrays
     templateCovVec = np.square(templateError.reshape(templateError.size,)) # convert array to vector, row-by-row, and square the standard deviations into variances
+    # print(templateCovVec)
     searchCovVec = np.square(searchError.reshape(searchError.size,))
+    # print(searchCovVec)
     covVec = np.hstack((templateCovVec, searchCovVec))
+    # print(covVec)
     C = np.diag(covVec)
+    # print(C)
 
     # get the Jacobian
     J = ncc_jacobian(template, search, ncc, p)
 
     # propagate the template and search area errors into the 9 correlation elements; the covariance order is by row of the ncc array (i.e., ncc[0,0], ncc[0,1], ncc[0,2], ncc[1,0], ncc[1,1], ...)
-    nccCov = np.matmul(np.matmul(J,C),J.T)
+    nccCov = np.matmul(J,np.matmul(C,J.T))
 
     return nccCov
 
@@ -221,7 +241,7 @@ def ncc_jacobian(template, search, ncc, p):
                     searchSubPerturb = searchSub.copy()
                     searchSubPerturb[m,n] += p
 
-                    # compute perturbed ncc - prior method that is much slower
+                    # compute perturbed ncc - prior method based on FFT that is much slower
                     # nccTemplatePerturb = match_template(templatePerturb, searchSub)
                     # nccSearchPerturb = match_template(template, searchSubPerturb)
 
@@ -238,10 +258,10 @@ def ncc_jacobian(template, search, ncc, p):
                     #     searchSubPerturbN = 0
 
                     # compute perturbed ncc - brute force method that is about 20x faster than using skimage's match_template
-                    templatePerturbN = (templatePerturb - np.mean(templatePerturb)) / (np.std(templatePerturb) * sz)
-                    searchSubPerturbN = (searchSubPerturb - np.mean(searchSubPerturb)) / (np.std(searchSubPerturb) * sz)
-                    nccTemplatePerturb = np.sum(templatePerturbN * searchSubN)
-                    nccSearchPerturb = np.sum(templateN * searchSubPerturbN)
+                    templatePerturbN = (templatePerturb - np.mean(templatePerturb)) / (np.std(templatePerturb))
+                    searchSubPerturbN = (searchSubPerturb - np.mean(searchSubPerturb)) / (np.std(searchSubPerturb))
+                    nccTemplatePerturb = np.sum(templatePerturbN * searchSubN) / sz
+                    nccSearchPerturb = np.sum(templateN * searchSubPerturbN) / sz
                     # print(type(nccSearchPerturb))
                     # print(type(ncc[i,j]))
                     # print(nccSearchPerturb)
@@ -271,15 +291,17 @@ def prop_corr2peak(ncc, nccCov, deltaUV, p):
     for i in range(3): # rows
         for j in range(3): # columns
             nccPerturb = ncc.copy()
-            nccPerturb[i,j] += p
-            deltaUPerturb, deltaVPerturb = subpx_peak_taylor(nccPerturb)
-            jacobian[0,i*3+j] = (deltaUPerturb - deltaUV[0]) / p
-            jacobian[1,i*3+j] = (deltaVPerturb - deltaUV[1]) / p
-            # print(deltaVPerturb - deltaUV[1])
+            nccPerturb[i,j] += 0.001            
+            # deltaUPerturb, deltaVPerturb = subpx_peak_taylor(nccPerturb)            
+            deltaUPerturb, deltaVPerturb = subpx_peak_gsn(nccPerturb)
+            jacobian[0,i*3+j] = (deltaUPerturb - deltaUV[0]) / 0.001
+            jacobian[1,i*3+j] = (deltaVPerturb - deltaUV[1]) / 0.001
+            print(deltaVPerturb - deltaUV[1])
     
     # propagate the 3x3 array of correlation uncertainties into the sub-pixel U and V direction offsets
-    subPxPeakCov = np.matmul(np.matmul(jacobian,nccCov),jacobian.T)
-            
+    subPxPeakCov = np.matmul(jacobian, np.matmul(nccCov,jacobian.T))
+    
+    # print(nccCov)
     return subPxPeakCov
 
 
@@ -319,7 +341,7 @@ def get_image_arrays(propFlag):
 
     if propFlag:
         fromErrorCropped, t = rasterio.mask.mask(fromError, [bpoly], crop=True, nodata=0, indexes=1)
-        fromErrorCropped = fromHeightCropped.astype('float64')
+        fromErrorCropped = fromErrorCropped.astype('float64')
         toErrorCropped, t = rasterio.mask.mask(toError, [bpoly], crop=True, nodata=0, indexes=1)
         toErrorCropped = toErrorCropped.astype('float64')
     else:
@@ -338,6 +360,17 @@ def subpx_peak_taylor(ncc):
     
     delX = -(dyy*dx - dxy*dy) / (dxx*dyy - dxy*dxy)
     delY = -(dxx*dy - dxy*dx) / (dxx*dyy - dxy*dxy)
+    # print(type(delX))
+    # print(type(delY))
+
+    return [delX, delY] # delX is left-to-right; delY is top-to-bottom; note that delX == delU and delY == delV
+
+
+def subpx_peak_gsn(ncc):
+    delX = (np.log(ncc[1,0],dtype=np.float64) - np.log(ncc[1,2],dtype=np.float64)) / (2*np.log(ncc[1,0],dtype=np.float64) - 4*np.log(ncc[1,1],dtype=np.float64) + 2*np.log(ncc[1,2],dtype=np.float64))
+    delY = (np.log(ncc[0,1],dtype=np.float64) - np.log(ncc[2,1],dtype=np.float64)) / (2*np.log(ncc[0,1],dtype=np.float64) - 4*np.log(ncc[1,1],dtype=np.float64) + 2*np.log(ncc[2,1],dtype=np.float64))
+    # print(type(delX))
+    # print(type(delY))
 
     return [delX, delY] # delX is left-to-right; delY is top-to-bottom; note that delX == delU and delY == delV
 
