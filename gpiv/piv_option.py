@@ -14,6 +14,7 @@ import time
 
 
 def piv(template_sz, step_sz, prop_flag):
+    
     if prop_flag:
         p = 0.000001  # Perturbation value for numeric partial derivatives
         sub_px_peak_cov = []
@@ -24,10 +25,10 @@ def piv(template_sz, step_sz, prop_flag):
     # Number of search areas in horizontal (u) and vertical (v)
     search_sz = template_sz * 2
     img_shape = from_height.shape
-    # u_count = math.floor((img_shape[1]-search_sz) / step_sz)
-    # v_count = math.floor((img_shape[0]-search_sz) / step_sz)
-    u_count = math.floor((img_shape[1]) / step_sz)
-    v_count = math.floor((img_shape[0]) / step_sz)
+    u_count = math.floor((img_shape[1]-search_sz) / step_sz)
+    v_count = math.floor((img_shape[0]-search_sz) / step_sz)
+    # u_count = math.floor((img_shape[1]) / step_sz)
+    # v_count = math.floor((img_shape[0]) / step_sz)
 
     # cycle through each set of search and template areas
     origin_uv = []
@@ -291,12 +292,12 @@ def prop_corr2peak(ncc, nccCov, deltaUV, p):
     for i in range(3): # rows
         for j in range(3): # columns
             nccPerturb = ncc.copy()
-            nccPerturb[i,j] += 0.001            
-            # deltaUPerturb, deltaVPerturb = subpx_peak_taylor(nccPerturb)            
-            deltaUPerturb, deltaVPerturb = subpx_peak_gsn(nccPerturb)
-            jacobian[0,i*3+j] = (deltaUPerturb - deltaUV[0]) / 0.001
-            jacobian[1,i*3+j] = (deltaVPerturb - deltaUV[1]) / 0.001
-            print(deltaVPerturb - deltaUV[1])
+            nccPerturb[i,j] += p            
+            deltaUPerturb, deltaVPerturb = subpx_peak_taylor(nccPerturb)            
+            # deltaUPerturb, deltaVPerturb = subpx_peak_gsn(nccPerturb)
+            jacobian[0,i*3+j] = (deltaUPerturb - deltaUV[0]) / p
+            jacobian[1,i*3+j] = (deltaVPerturb - deltaUV[1]) / p
+            # print(deltaVPerturb - deltaUV[1])
     
     # propagate the 3x3 array of correlation uncertainties into the sub-pixel U and V direction offsets
     subPxPeakCov = np.matmul(jacobian, np.matmul(nccCov,jacobian.T))
