@@ -2,6 +2,7 @@ import math
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import iqr
 
 
 with open('piv_origins_offsets.json') as jsonFile:
@@ -12,6 +13,8 @@ yDisp = disp[:,3]
 mDisp = np.sqrt(xDisp**2 + yDisp**2) # magnitude displacement
 print('x std = {}'.format(np.std(xDisp)))
 print('y std = {}'.format(np.std(yDisp)))
+print('x iqr = {}'.format(iqr(xDisp)))
+print('y iqr = {}'.format(iqr(yDisp)))
 
 # with open('piv_covariance_matrices.json') as jsonFile:
 #     cov = json.load(jsonFile)
@@ -38,11 +41,17 @@ print('y std = {}'.format(np.std(yDisp)))
 # mCnt = 0
 # num = comp.shape[0]
 # for i in range(num):
-#     if (abs(comp[i,0]) <= comp[i,3]):
+#     xNewStd = math.sqrt(comp[i,3]**2 + 0.052**2)
+#     yNewStd = math.sqrt(comp[i,4]**2 + 0.052**2)
+#     bias = np.array([[0.052**2,0],[0,0.052**2]])
+#     eigenVals, eigenVecs = np.linalg.eig(cov[i] + bias)
+#     idxMax = np.argmax(eigenVals)
+#     semiMajorNew = math.sqrt(2.298*eigenVals[idxMax])
+#     if (abs(comp[i,0]) <= xNewStd):
 #         xCnt += 1
-#     if (abs(comp[i,1]) <= comp[i,4]):
+#     if (abs(comp[i,1]) <= yNewStd):
 #         yCnt += 1
-#     if (abs(comp[i,2]) <= comp[i,5]):
+#     if (abs(comp[i,2]) <= semiMajorNew):
 #         mCnt += 1
 # xPct = xCnt / num
 # yPct = yCnt / num
