@@ -13,19 +13,17 @@ def show(f, t, h, e, vec, vecSF, ell, ellSF):
 
     # open vectors and plot if requested
     if vec:
-        vecSF = float(vecSF)
-        plot_vectors(fig, ax, geoWidth, vecSF)
+        plot_vectors(ax, geoWidth)
 
     # open ellipses and plot if requested
     if ell:
-        ellSF = float(ellSF)
-        plot_ellipses(ax, ellSF)
+        plot_ellipses(ax, geoWidth)
 
     # show
     plt.show()
 
 
-def plot_vectors(fig, ax, geoWidth, vecSF):
+def plot_vectors(ax, geoWidth):
     bbox = ax.get_window_extent()
     pxWidth = bbox.width
     pxPerGeo = pxWidth / geoWidth
@@ -38,19 +36,36 @@ def plot_vectors(fig, ax, geoWidth, vecSF):
     vecLen = np.linalg.norm(dn[:,2:], axis=1) * pxPerGeo # convert to pixels
     nomVecSF = 15 / np.median(vecLen) # scale factor to convert median vector length to 15 pixels
     nomHeadSF = 7 / pxPerGeo
+
+    ax.text(0.95, -0.05, 'median vector length = {}'.format(np.median(vecLen)),
+        verticalalignment='bottom', horizontalalignment='right',
+        transform=ax.transAxes,
+        fontsize=10)
         
     for i in range(len(d)):
         # add arrow with base at vector origin
-        a = patch.FancyArrow(d[i][0], d[i][1], d[i][2]*nomVecSF*vecSF, -d[i][3]*nomVecSF*vecSF, # the negative sign converts from dV (postive down) to dY (positive up)
-                            length_includes_head=True, head_width=nomHeadSF*vecSF, overhang=0.8, fc='green', ec='green')
+        a = patch.FancyArrow(d[i][0], d[i][1], d[i][2]*nomVecSF, -d[i][3]*nomVecSF, # the negative sign converts from dV (postive down) to dY (positive up)
+                            length_includes_head=True, head_width=nomHeadSF, overhang=0.8, fc='green', ec='green')
         ax.add_artist(a)
 
 
-def plot_ellipses(ax, ellSF):
+def plot_ellipses(ax, geoWidth):
+    bbox = ax.get_window_extent()
+    pxWidth = bbox.width
+    pxPerGeo = pxWidth / geoWidth
+
     with open('piv_origins_offsets.json') as jsonFile:
         d = json.load(jsonFile)
     with open('piv_covariance_matrices.json') as jsonFile:
         c = json.load(jsonFile)
+
+    # nominal ellipse semi-major scale factor
+    semimajor = []
+    for i in range(len(d)):
+        eigenVals, eigenVecs = np.linalg.eig(c[i])
+        idxMax = np.argmax(eigenVals)
+        semimajor.append(math.sqrt(2.298*eigenVals[idxMax])) # scale factor of 2.298 to create a 68% confidence ellipse
+    nomEllSF = 20 / np.median(semimajor)
     
     for i in range(len(d)):
         # semi-major and minor axes directions and half-lengths
@@ -61,7 +76,7 @@ def plot_ellipses(ax, ellSF):
         semiminor = math.sqrt(2.298*eigenVals[idxMin])
         angle = np.degrees(np.arctan(eigenVecs[idxMax][1]/eigenVecs[idxMax][0]))
         # add ellipse centered at location of actual (not scaled) displacement            
-        e = patch.Ellipse((d[i][0]+d[i][2], d[i][1]-d[i][3]), semimajor*ellSF, semiminor*ellSF, # the negative sign in 'd[i][1]-d[i][3]' converts from dV (postive down) to dY (positive up)
+        e = patch.Ellipse((d[i][0]+d[i][2], d[i][1]-d[i][3]), semimajor*nomEllSF, semiminor*nomEllSF, # the negative sign in 'd[i][1]-d[i][3]' converts from dV (postive down) to dY (positive up)
                           angle=angle, fc='None', ec='red')            
         ax.add_artist(e)
 

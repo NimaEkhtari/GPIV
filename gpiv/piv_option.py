@@ -13,7 +13,71 @@ from show_option import show
 import time
 
 
+def reject_outliers(data, m):
+    return data[abs(data - np.mean(data)) < m*np.std(data)]
+
+
 def piv(template_sz, step_sz, prop_flag):
+    if prop_flag:
+        # run piv on identical image (fromHeight) with no error propagation
+        print('Computing subpixel bias uncertainty.')
+        from_height, from_error, to_height, to_error, transform = get_image_arrays(False)
+        run_piv(template_sz, step_sz, False)
+        with open('piv_origins_offsets.json') as jsonFile:
+            bias = json.load(jsonFile)
+        bias = np.asarray(bias)
+        xBias = bias[:,2]
+        yBias = bias[:,3]
+        print('X bias standard deviation = {}'.format(np.std(xBias)))
+        print('Y bias standard deviation = {}'.format(np.std(yBias)))
+        xBias2 = reject_outliers(xBias, 3)
+        yBias2 = reject_outliers(yBias, 3)
+        xBiasVar = np.var(xBias2)
+        yBiasVar = np.var(yBias2)
+        print('X bias standard deviation = {}'.format(np.std(xBias2)))
+        print('Y bias standard deviation = {}'.format(np.std(yBias2)))
+
+        figTemp = plt.figure()
+        ax1 = plt.subplot(1, 2, 1)
+        ax2 = plt.subplot(1, 2, 2)
+        plt.sca(ax1)
+        ax1.set_title('X Displacement')
+        plt.hist(xBias2, 20)
+        plt.sca(ax2)
+        ax2.set_title('Y Displacement')
+        plt.hist(yBias2, 20)
+        plt.show()
+        plt.close(figTemp)
+
+        # run piv on 'to' and 'from' images with error propagation
+        print('Computing PIV and propagating source error.')
+        from_height, from_error, to_height, to_error, transform = get_image_arrays(True)
+        run_piv(template_sz, step_sz, True)
+
+        # update the propagated error with the subpixel bias variances
+        print('Combining subpixel bias uncertainty with propagated error.')
+        with open('piv_covariance_matrices.json') as jsonFile:
+            propCov = json.load(jsonFile)
+        for i in range(len(propCov)):
+            propCov[i][0][0] += xBiasVar
+            propCov[i][1][1] += yBiasVar
+        json.dump(propCov, open("piv_covariance_matrices.json", "w"))
+        print("PIV bias + error propagation covariance matrices saved to file 'piv_covariance_matrices.json'")   
+
+        # plot the displacement vectors and error ellipses on top of 'from' image with ellipses    
+        show(True, False, True, False, True, True)
+    
+    else:
+        # run piv on 'to' and 'from' images with no error propagation
+        print('Computing PIV.')
+        from_height, from_error, to_height, to_error, transform = get_image_arrays(False)
+        run_piv(template_sz, step_sz, False)
+        
+        # plot the displacement vectors on top of 'from' image       
+        show(True, False, True, False, True, False)
+
+
+def run_piv(template_sz, step_sz, prop_flag):
     
     if prop_flag:
         p = 0.000001  # Perturbation value for numeric partial derivatives
@@ -140,6 +204,7 @@ def piv(template_sz, step_sz, prop_flag):
             # t11 = time.time()
             # print("total time={}".format(t11-t00))
 
+    plt.close(fig)    
 
     # convert vector origins and offsets from pixels to ground distance json file
     origin_uv = np.asarray(origin_uv)        
@@ -158,17 +223,7 @@ def piv(template_sz, step_sz, prop_flag):
     # export covariance matrices to json
     if prop_flag:
         json.dump(sub_px_peak_cov, open("piv_covariance_matrices.json", "w"))
-        print("PIV displacement covariance matrices saved to file 'piv_covariance_matrices.json'")
-
-    # plot the displacement vectors on top of 'from' image 
-    plt.close(fig)
-    maxImgDim = np.amax(from_height.shape) * transform[0]
-    if prop_flag:        
-        vecSF, ellSF = vec_ellipse_scales(offset_uv, sub_px_peak_cov, maxImgDim, prop_flag)
-        show(True, False, True, False, True, vecSF, True, ellSF)
-    else:
-        vecSF, ellSF = vec_ellipse_scales(offset_uv, [], maxImgDim, prop_flag)
-        show(True, False, True, False, True, vecSF, False, False)
+        print("PIV error propagation covariance matrices saved to file 'piv_covariance_matrices.json'")    
 
 
 def vec_ellipse_scales(offsetUV, subPxPeakCov, maxImgDim, propFlag):
