@@ -8,8 +8,8 @@ from scipy.stats import iqr
 with open('piv_origins_offsets.json') as jsonFile:
     disp = json.load(jsonFile)
 disp = np.asarray(disp)
-xDisp = disp[:,2]
-yDisp = disp[:,3]
+xDisp = disp[:,2] + 1.7
+yDisp = disp[:,3] - 1.7
 mDisp = np.sqrt(xDisp**2 + yDisp**2) # magnitude displacement
 print('x mean = {}'.format(np.mean(xDisp)))
 print('y mean = {}'.format(np.mean(yDisp)))
@@ -34,8 +34,8 @@ for i in range(cov.shape[0]):
     idxMax = np.argmax(eigenVals)
     semiMajor.append(math.sqrt(2.298*eigenVals[idxMax])) # scale factor of 2.298 to create a 68% confidence ellipse
 
-print('Mean est x std = {}'.format(np.mean(xStd)))
-print('Mean est y std = {}'.format(np.mean(yStd)))
+# print('Mean est x std = {}'.format(np.mean(xStd)))
+# print('Mean est y std = {}'.format(np.mean(yStd)))
 
 comp = np.column_stack((xDisp,yDisp,mDisp,xStd,yStd,semiMajor))
 np.set_printoptions(precision=3, suppress=True)
@@ -46,12 +46,12 @@ yCnt = 0
 mCnt = 0
 num = comp.shape[0]
 for i in range(num):
-    xNewStd = math.sqrt(comp[i,3]**2 + 0.052**2)
-    yNewStd = math.sqrt(comp[i,4]**2 + 0.052**2)
-    bias = np.array([[0.052**2,0],[0,0.052**2]])
-    eigenVals, eigenVecs = np.linalg.eig(cov[i] + bias)
-    idxMax = np.argmax(eigenVals)
-    semiMajorNew = math.sqrt(2.298*eigenVals[idxMax])
+    # xNewStd = math.sqrt(comp[i,3]**2 + 0.052**2)
+    # yNewStd = math.sqrt(comp[i,4]**2 + 0.052**2)
+    # bias = np.array([[0.052**2,0],[0,0.052**2]])
+    # eigenVals, eigenVecs = np.linalg.eig(cov[i] + bias)
+    # idxMax = np.argmax(eigenVals)
+    # semiMajorNew = math.sqrt(2.298*eigenVals[idxMax])
     if (abs(comp[i,0]) <= comp[i,3]):
         xCnt += 1
     if (abs(comp[i,1]) <= comp[i,4]):

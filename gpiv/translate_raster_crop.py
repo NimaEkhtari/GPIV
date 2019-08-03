@@ -4,7 +4,7 @@ import json
 import os
 
 
-inLas = "D:/dev/data/PIVDemoFiles/LidarPointClouds/CanadaGlacier_NASA.las"
+inLas = "C:/dev/data/PIVDemoFiles/LidarPointClouds/CanadaGlacier_NCALM.las"
 rasterSize = 5
 
 rasterRadius = float(rasterSize)*math.sqrt(0.5)
@@ -25,32 +25,32 @@ def clean_multiple(num, multiple, direction):
             return num - remainder
 
 
-for i in range(0,14,2):
-    tMatrix = "1 0 0 {} 0 1 0 {} 0 0 1 0 0 0 0 1".format(i,i)
-    outLas = inLas[:-4] + "_Tx{}Ty{}.las".format(i,i)
-    outTif = outLas[:-4] + ".tif"
+# for i in range(0,14,2):
+#     tMatrix = "1 0 0 {} 0 1 0 {} 0 0 1 0 0 0 0 1".format(i,i)
+#     outLas = inLas[:-4] + "_Tx{}Ty{}.las".format(i,i)
+#     outTif = outLas[:-4] + ".tif"
 
-    # shift point cloud in x and y
-    jsonDict = {
-        "pipeline": [
-            {
-                "type": "readers.las",
-                "filename": inLas
-            },
-            {
-                "type": "filters.transformation",
-                "matrix": tMatrix
-            },
-            {
-                "type": "writers.las",
-                "filename": outLas
-            }            
-        ]
-    }
-    jsonString = json.dumps(jsonDict)
-    pipeline = pdal.Pipeline(jsonString)
-    pipeline.validate()
-    pipeline.execute()
+#     # shift point cloud in x and y
+#     jsonDict = {
+#         "pipeline": [
+#             {
+#                 "type": "readers.las",
+#                 "filename": inLas
+#             },
+#             {
+#                 "type": "filters.transformation",
+#                 "matrix": tMatrix
+#             },
+#             {
+#                 "type": "writers.las",
+#                 "filename": outLas
+#             }            
+#         ]
+#     }
+#     jsonString = json.dumps(jsonDict)
+#     pipeline = pdal.Pipeline(jsonString)
+#     pipeline.validate()
+#     pipeline.execute()
 
     # # determine the raster bounds that will force the raster to use horizontal coordinates that are clean multiples of the raster resolution
     # jsonDict = {
@@ -82,30 +82,30 @@ for i in range(0,14,2):
 
     # bounds = "([{},{}],[{},{}])".format(minx,maxx,miny,maxy)
 
-    # raster points with pdal
-    jsonDict = {
-        "pipeline": [
-            {
-                "type": "readers.las",
-                "filename": outLas
-            },
-            {
-                "type": "writers.gdal",
-                "gdaldriver": "GTiff",
-                "resolution": rasterSize,
-                "radius": rasterRadius,
-                "bounds": "([21925,24435],[40825,43225])",                
-                "window_size": 5,
-                "nodata": 0,
-                "output_type": "idw",
-                "filename": outTif
-            }
-        ]
-    }
-    jsonString = json.dumps(jsonDict)
-    pipeline = pdal.Pipeline(jsonString)
-    pipeline.validate()
-    pipeline.execute()
+# raster points with pdal
+jsonDict = {
+    "pipeline": [
+        {
+            "type": "readers.las",
+            "filename": inLas
+        },
+        {
+            "type": "writers.gdal",
+            "gdaldriver": "GTiff",
+            "resolution": rasterSize,
+            "radius": rasterRadius,
+            "bounds": "([21925,24435],[40825,43225])",                
+            "window_size": 3,
+            "nodata": 0,
+            "output_type": "idw",
+            "filename": "NCALM_Height.tif"
+        }
+    ]
+}
+jsonString = json.dumps(jsonDict)
+pipeline = pdal.Pipeline(jsonString)
+pipeline.validate()
+pipeline.execute()
 
 
 

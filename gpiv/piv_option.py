@@ -23,8 +23,8 @@ def piv(template_sz, step_sz, prop_flag):
     if prop_flag:
         # run piv on identical image (fromHeight) with no error propagation
         print('Computing subpixel bias uncertainty.')
-        from_height, from_error, to_height, to_error, transform = get_image_arrays(False)
-        run_piv(template_sz, step_sz, False)
+        from_height, from_error, to_height, to_error, transform = get_image_arrays(True)
+        run_piv(from_height, [], from_height, [], transform, template_sz, step_sz, False)
         with open('piv_origins_offsets.json') as jsonFile:
             bias = json.load(jsonFile)
         bias = np.asarray(bias)
@@ -53,8 +53,7 @@ def piv(template_sz, step_sz, prop_flag):
 
         # run piv on 'to' and 'from' images with error propagation
         print('Computing PIV and propagating source error.')
-        from_height, from_error, to_height, to_error, transform = get_image_arrays(True)
-        run_piv(template_sz, step_sz, True)
+        run_piv(from_height, from_error, to_height, to_error, transform, template_sz, step_sz, True)
 
         # update the propagated error with the subpixel bias variances
         print('Combining subpixel bias uncertainty with propagated error.')
@@ -73,19 +72,19 @@ def piv(template_sz, step_sz, prop_flag):
         # run piv on 'to' and 'from' images with no error propagation
         print('Computing PIV.')
         from_height, from_error, to_height, to_error, transform = get_image_arrays(False)
-        run_piv(template_sz, step_sz, False)
+        run_piv(from_height, [], to_height, [], transform, template_sz, step_sz, False)
         
         # plot the displacement vectors on top of 'from' image       
         show(True, False, True, False, True, 1, False, 1)
 
 
-def run_piv(template_sz, step_sz, prop_flag):
+def run_piv(from_height, from_error, to_height, to_error, transform, template_sz, step_sz, prop_flag):
     
     if prop_flag:
         p = 0.000001  # Perturbation value for numeric partial derivatives
         sub_px_peak_cov = []
 
-    from_height, from_error, to_height, to_error, transform = get_image_arrays(prop_flag)
+    # from_height, from_error, to_height, to_error, transform = get_image_arrays(prop_flag)
 
     # Number of search areas in horizontal (u) and vertical (v)
     search_sz = template_sz * 2
