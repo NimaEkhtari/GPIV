@@ -8,9 +8,14 @@ from scipy.stats import iqr
 with open('piv_origins_offsets.json') as jsonFile:
     disp = json.load(jsonFile)
 disp = np.asarray(disp)
-xDisp = disp[:,2] + 1.8
-yDisp = disp[:,3] - 1.8
+xDisp = disp[:,2]
+yDisp = disp[:,3]
 mDisp = np.sqrt(xDisp**2 + yDisp**2) # magnitude displacement
+print('x mean = {}'.format(np.mean(xDisp)))
+print('y mean = {}'.format(np.mean(yDisp)))
+print('x median = {}'.format(np.median(xDisp)))
+print('y median = {}'.format(np.median(yDisp)))
+print('mag median = {}'.format(np.median(mDisp)))
 print('x std = {}'.format(np.std(xDisp)))
 print('y std = {}'.format(np.std(yDisp)))
 print('x iqr = {}'.format(iqr(xDisp)))

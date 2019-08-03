@@ -11,6 +11,8 @@ import time
 import json
 from show_option import show
 import time
+from mpl_toolkits.mplot3d import Axes3D 
+from matplotlib import cm
 
 
 def reject_outliers(data, m):
@@ -65,7 +67,7 @@ def piv(template_sz, step_sz, prop_flag):
         print("PIV bias + error propagation covariance matrices saved to file 'piv_covariance_matrices.json'")   
 
         # plot the displacement vectors and error ellipses on top of 'from' image with ellipses    
-        show(True, False, True, False, True, True)
+        show(True, False, True, False, True, 1, True, 1)
     
     else:
         # run piv on 'to' and 'from' images with no error propagation
@@ -74,7 +76,7 @@ def piv(template_sz, step_sz, prop_flag):
         run_piv(template_sz, step_sz, False)
         
         # plot the displacement vectors on top of 'from' image       
-        show(True, False, True, False, True, False)
+        show(True, False, True, False, True, 1, False, 1)
 
 
 def run_piv(template_sz, step_sz, prop_flag):
@@ -83,8 +85,7 @@ def run_piv(template_sz, step_sz, prop_flag):
         p = 0.000001  # Perturbation value for numeric partial derivatives
         sub_px_peak_cov = []
 
-    from_height, from_error, to_height, to_error, transform = get_image_arrays(
-        prop_flag)
+    from_height, from_error, to_height, to_error, transform = get_image_arrays(prop_flag)
 
     # Number of search areas in horizontal (u) and vertical (v)
     search_sz = template_sz * 2
@@ -105,22 +106,11 @@ def run_piv(template_sz, step_sz, prop_flag):
             # t00 = time.time()
 
             # get template area data from the 'from' height and error images
-            templateStartU = int(
-                j*step_sz 
-                + math.ceil(template_sz/2))
-            templateEndU = int(
-                j*step_sz 
-                + math.ceil(template_sz/2) 
-                + template_sz)
-            templateStartV = int(
-                i*step_sz 
-                + math.ceil(template_sz/2))
-            templateEndV = int(
-                i*step_sz 
-                + math.ceil(template_sz/2) 
-                + template_sz)
-            templateHeight = from_height[
-                templateStartV:templateEndV,templateStartU:templateEndU].copy()
+            templateStartU = int(j*step_sz + math.ceil(template_sz/2))
+            templateEndU = int(j*step_sz + math.ceil(template_sz/2) + template_sz)
+            templateStartV = int(i*step_sz + math.ceil(template_sz/2))
+            templateEndV = int(i*step_sz + math.ceil(template_sz/2) + template_sz)
+            templateHeight = from_height[templateStartV:templateEndV,templateStartU:templateEndU].copy()
             
             # get search area data from the 'to' height and error images. 
             searchStartU = int(j*step_sz)
@@ -131,6 +121,9 @@ def run_piv(template_sz, step_sz, prop_flag):
                 searchStartV:searchEndV,searchStartU:searchEndU].copy()            
 
             # show template and search patches on 'from' and 'to' images for visual progress indication
+            # fig = plt.figure()
+            # ax1 = plt.subplot(1, 2, 1)
+            # ax2 = plt.subplot(1, 2, 2)
             plt.sca(ax1)
             plt.cla()
             ax1.set_title('FROM')
@@ -151,6 +144,17 @@ def run_piv(template_sz, step_sz, prop_flag):
             ncc = match_template(searchHeight, templateHeight)
             # normalized cross correlation between the template and search area height data - slower, but is pure spatial ncc (not FFT-based) 
             # ncc = ncc_running_sums(searchHeight, templateHeight)
+            # fig2 = plt.figure()
+            # ax3 = fig2.gca(projection='3d')
+            # val = template_sz/2
+            # X = np.arange(-val,val+1,1)
+            # Y = X
+            # X, Y = np.meshgrid(X, Y)
+            # surf = ax3.plot_surface(X, Y, ncc, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+            # ax3.set_zlim(-0.4, 1)
+            # ax3.set_xlim(-12, 12)
+            # ax3.set_ylim(-12, 12)
+            # plt.show()
 
             # maximum in the ncc surface
             nccMax = np.where(ncc == np.amax(ncc))

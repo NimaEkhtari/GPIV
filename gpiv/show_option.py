@@ -11,19 +11,19 @@ def show(f, t, h, e, vec, vecSF, ell, ellSF):
     # open the requested raster and plot
     fig, ax, geoWidth = plot_raster(f, t, h, e)
 
-    # open vectors and plot if requested
-    if vec:
-        plot_vectors(ax, geoWidth)
-
     # open ellipses and plot if requested
     if ell:
-        plot_ellipses(ax, geoWidth)
+        plot_ellipses(ax, geoWidth, float(ellSF))
+
+    # open vectors and plot if requested
+    if vec:
+        plot_vectors(ax, geoWidth, float(vecSF))
 
     # show
     plt.show()
 
 
-def plot_vectors(ax, geoWidth):
+def plot_vectors(ax, geoWidth, vecSF):
     bbox = ax.get_window_extent()
     pxWidth = bbox.width
     pxPerGeo = pxWidth / geoWidth
@@ -33,23 +33,24 @@ def plot_vectors(ax, geoWidth):
     
     # nominal vector length scale factor
     dn = np.asarray(d)
-    vecLen = np.linalg.norm(dn[:,2:], axis=1) * pxPerGeo # convert to pixels
-    nomVecSF = 15 / np.median(vecLen) # scale factor to convert median vector length to 15 pixels
-    nomHeadSF = 7 / pxPerGeo
+    vecLen = np.linalg.norm(dn[:,2:], axis=1)
+    vecLenPx = vecLen * pxPerGeo # convert to pixels
+    nomVecSF = 20 / np.median(vecLenPx) # scale factor to convert median vector length to 15 pixels
+    nomHeadSF = 10 / pxPerGeo
 
-    ax.text(0.95, -0.05, 'median vector length = {}'.format(np.median(vecLen)),
+    ax.text(0.97, 0.11, 'Median Vector Length = {:0.3f}'.format(np.median(vecLen)),
         verticalalignment='bottom', horizontalalignment='right',
         transform=ax.transAxes,
-        fontsize=10)
+        fontsize=10, bbox=dict(fc='white', alpha = 0.75))
         
     for i in range(len(d)):
         # add arrow with base at vector origin
-        a = patch.FancyArrow(d[i][0], d[i][1], d[i][2]*nomVecSF, -d[i][3]*nomVecSF, # the negative sign converts from dV (postive down) to dY (positive up)
-                            length_includes_head=True, head_width=nomHeadSF, overhang=0.8, fc='green', ec='green')
+        a = patch.FancyArrow(d[i][0], d[i][1], d[i][2]*nomVecSF*vecSF, -d[i][3]*nomVecSF*vecSF, # the negative sign converts from dV (postive down) to dY (positive up)
+                            length_includes_head=True, head_width=nomHeadSF, overhang=0.8, fc='yellow', ec='yellow')
         ax.add_artist(a)
 
 
-def plot_ellipses(ax, geoWidth):
+def plot_ellipses(ax, geoWidth, ellSF):
     bbox = ax.get_window_extent()
     pxWidth = bbox.width
     pxPerGeo = pxWidth / geoWidth
@@ -59,13 +60,26 @@ def plot_ellipses(ax, geoWidth):
     with open('piv_covariance_matrices.json') as jsonFile:
         c = json.load(jsonFile)
 
+    # # nominal vector length scale factor
+    # dn = np.asarray(d)
+    # vecLenPx = np.linalg.norm(dn[:,2:], axis=1) * pxPerGeo # convert to pixels
+    # nomEllSF = 20 / np.median(vecLenPx) # scale factor to convert median vector length to 15 pixels
+
     # nominal ellipse semi-major scale factor
     semimajor = []
+    semimajorPx = []
     for i in range(len(d)):
         eigenVals, eigenVecs = np.linalg.eig(c[i])
         idxMax = np.argmax(eigenVals)
         semimajor.append(math.sqrt(2.298*eigenVals[idxMax])) # scale factor of 2.298 to create a 68% confidence ellipse
-    nomEllSF = 20 / np.median(semimajor)
+        semimajorPx.append(math.sqrt(2.298*eigenVals[idxMax])*pxPerGeo)
+    nomEllSF = 15 / np.median(semimajorPx)
+
+    # add text for scale
+    ax.text(0.97, 0.03, 'Median 1\u03C3 Ellipse Semi-major = {:0.3f}'.format(np.median(semimajor)),
+        verticalalignment='bottom', horizontalalignment='right',
+        transform=ax.transAxes,
+        fontsize=10, bbox=dict(fc='white', alpha = 0.75))
     
     for i in range(len(d)):
         # semi-major and minor axes directions and half-lengths
@@ -76,7 +90,7 @@ def plot_ellipses(ax, geoWidth):
         semiminor = math.sqrt(2.298*eigenVals[idxMin])
         angle = np.degrees(np.arctan(eigenVecs[idxMax][1]/eigenVecs[idxMax][0]))
         # add ellipse centered at location of actual (not scaled) displacement            
-        e = patch.Ellipse((d[i][0]+d[i][2], d[i][1]-d[i][3]), semimajor*nomEllSF, semiminor*nomEllSF, # the negative sign in 'd[i][1]-d[i][3]' converts from dV (postive down) to dY (positive up)
+        e = patch.Ellipse((d[i][0]+d[i][2], d[i][1]-d[i][3]), semimajor*nomEllSF*ellSF, semiminor*nomEllSF*ellSF, # the negative sign in 'd[i][1]-d[i][3]' converts from dV (postive down) to dY (positive up)
                           angle=angle, fc='None', ec='red')            
         ax.add_artist(e)
 
@@ -104,12 +118,14 @@ def plot_raster(f, t, h, e):
                 plotRaster = src.read(1, masked=True)
                 plotLRBT = list(rasterio.plot.plotting_extent(src)) 
             plotTitle = 'To (error)'
+    
+    plotTitle = 'Scaled Vectors & Error Ellipses'
 
     # tm = src.transform
     src.close()
     plotMin = min(np.percentile(plotRaster.compressed(), 1), np.percentile(plotRaster.compressed(), 1))
     plotMax = max(np.percentile(plotRaster.compressed(), 99), np.percentile(plotRaster.compressed(), 99))
-    fig = plt.figure()
+    fig = plt.figure(figsize=(6,6))
     ax = plt.gca()
     plt.imshow(plotRaster, cmap=plt.cm.gray, extent=plotLRBT,vmin=plotMin,vmax=plotMax)
     ax.set_title(plotTitle)
