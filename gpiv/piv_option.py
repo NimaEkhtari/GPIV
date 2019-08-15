@@ -84,15 +84,11 @@ def run_piv(from_height, from_error, to_height, to_error, transform, template_sz
         p = 0.000001  # Perturbation value for numeric partial derivatives
         sub_px_peak_cov = []
 
-    # from_height, from_error, to_height, to_error, transform = get_image_arrays(prop_flag)
-
     # Number of search areas in horizontal (u) and vertical (v)
     search_sz = template_sz * 2
     img_shape = from_height.shape
     u_count = math.floor((img_shape[1]-search_sz) / step_sz)
     v_count = math.floor((img_shape[0]-search_sz) / step_sz)
-    # u_count = math.floor((img_shape[1]) / step_sz)
-    # v_count = math.floor((img_shape[0]) / step_sz)
 
     # cycle through each set of search and template areas
     origin_uv = []
