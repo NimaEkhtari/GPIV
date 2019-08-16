@@ -24,8 +24,8 @@ if __name__ == '__main__':
 		
 		my_piv = Piv(args['<before_height>'], args['<after_height>'], args['<template_size>'], args['<step_size>'], args['-p'])
 		if my_piv.propagate:
-			my_piv.before_uncertainty = args['before_uncertainty']
-			my_piv.after_uncertainty = args['after_uncertainty']
+			my_piv.before_uncertainty_file = args['before_uncertainty']
+			my_piv.after_uncertainty_file = args['after_uncertainty']
 		
 		# my_piv.run_piv()
 	
