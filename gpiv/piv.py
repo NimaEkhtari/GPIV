@@ -11,7 +11,7 @@ class Piv:
         self.template_size = template_size
         self.step_size = step_size
         self.propagate = False
-        self.output_base_name = None 
+        self.output_base_name = ""
         self.before_uncertainty_file = None
         self.after_uncertainty_file = None
 
@@ -93,8 +93,7 @@ class Piv:
             sys.exit()
     
     def run(self):
-
-        before_height, before_error, after_height, after_error, geo_transform = piv_functions.get_image_arrays(
+        before_height, before_uncertainty, after_height, after_uncertainty, geo_transform = piv_functions.get_image_arrays(
             self.__before_height_file,
             self.__before_uncertainty_file,
             self.__after_height_file,

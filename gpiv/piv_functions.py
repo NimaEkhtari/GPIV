@@ -4,6 +4,8 @@ import sys
 from skimage.feature import match_template
 import matplotlib.pyplot as plt
 import matplotlib.patches
+import math
+import json
 
 
 def get_image_arrays(
@@ -13,19 +15,21 @@ def get_image_arrays(
     after_uncertainty_file,
     propagate):    
 
-    before_height = rasterio.open(before_height_file)
-    after_height = rasterio.open(after_height_file)
+    before_height_source = rasterio.open(before_height_file)
+    before_height = before_height_source.read(1)
+    after_height_source = rasterio.open(after_height_file)
+    after_height = after_height_source.read(1)
 
     if propagate:
-        before_uncertainty = rasterio.open(before_uncertainty_file)
-        after_uncertainty = rasterio.open(after_uncertainty_file)
+        before_uncertainty = rasterio.open(before_uncertainty_file).read(1)
+        after_uncertainty = rasterio.open(after_uncertainty_file).read(1)
     else:
         before_uncertainty = []
         after_uncertainty = []
 
     # get raster coordinate transformation for later use
-    before_geo_transform = np.reshape(np.asarray(before_height.transform), (3,3))
-    after_geo_transform = np.reshape(np.asarray(after_height.transform), (3,3))
+    before_geo_transform = np.reshape(np.asarray(before_height_source.transform), (3,3))
+    after_geo_transform = np.reshape(np.asarray(after_height_source.transform), (3,3))
     if not np.array_equal(before_geo_transform, after_geo_transform):
         print("The extent and/or datum of the 'before' and 'after' DEMs is not equivalent.")
         sys.exit()    
@@ -44,8 +48,8 @@ def run_piv(
     propagate,
     output_base_name):
     
-    vector_origins_col_row = []
-    vectors_col_row = []
+    piv_origins = []
+    piv_vectors = []
     if propagate:
         peak_covariance = []
         numeric_partial_derivative_increment = 0.000001
@@ -74,6 +78,7 @@ def run_piv(
             height_search = after_height[vt_search_start:vt_search_end, hz_search_start:hz_search_end].copy()            
 
             show_piv_location(
+                before_height, after_height,
                 before_axis, after_axis,
                 hz_template_start, vt_template_start,
                 hz_search_start, vt_search_start,
@@ -98,10 +103,10 @@ def run_piv(
                     correlation_max[0][0]-1:correlation_max[0][0]+2,
                     correlation_max[1][0]-1:correlation_max[1][0]+2])
             
-            vector_origins_col_row.append(((hz_count*step_size + template_size - (1 - template_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
-                                           (vt_count*step_size + template_size - (1 - template_size % 2)*0.5)))
-            vectors_col_row.append(((correlation_max[1][0] - math.ceil(template_size/2) + subpixel_peak[0]),
-                                    (correlation_max[0][0] - math.ceil(template_size/2) + subpixel_peak[1])))
+            piv_origins.append(((hz_count*step_size + template_size - (1 - template_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
+                                (vt_count*step_size + template_size - (1 - template_size % 2)*0.5)))
+            piv_vectors.append(((correlation_max[1][0] - math.ceil(template_size/2) + subpixel_peak[0]),
+                                (correlation_max[0][0] - math.ceil(template_size/2) + subpixel_peak[1])))
 
             if propagate:
                 uncertainty_template = before_uncertainty[vt_template_start:vt_template_end, hz_template_start:hz_template_end].copy()
@@ -123,42 +128,25 @@ def run_piv(
                     subpixel_peak,
                     numeric_partial_derivative_increment)
                 
-                # convert covariance matrix from pixels squared to ground distance squared
-                subpixel_peak_covariance *= geo_transform[0,0]**2
-
                 peak_covariance.append(subpixel_peak_covariance.tolist())   
 
     plt.close(status_figure)
 
-    convert_export_results(
-        vector_origins_col_row,
-        vectors_col_row,
+    export_piv(
+        piv_origins,
+        piv_vectors,
         geo_transform,
+        output_base_name)
 
-        propagate
-    )
-
-    # convert vector origins from pixels to ground distance
-    vector_origins_col_row = np.asarray(vector_origins_col_row)        
-    vector_origins_col_row *= geo_transform[0,0] # scale by pixel ground size
-    vector_origins_col_row[:,0] += geo_transform[0,2] # offset by leftmost pixel to get ground coordinate
-    vector_origins_col_row[:,1] = geo_transform[1,2] - vector_origins_col_row[:,1] # subtract from uppermost pixel to get ground coordinate
-    # convert vectors from pixels to ground distance
-    vectors_col_row = np.asarray(vectors_col_row)
-    vectors_col_row *= geo_transform[0],0 # scale by pixel ground size
-
-    # export vector origins and offsets to json
-    originOffset = np.concatenate((vector_origins_col_row, vectors_col_row), axis=1)
-    json.dump(originOffset.tolist(), open("piv_origins_offsets.json", "w"))
-    print("PIV vector origins and offsets saved to file 'piv_origins_offsets.json'")
-
-    # export covariance matrices to json
     if propagate:
-        json.dump(sub_px_peak_cov, open("piv_covariance_matrices.json", "w"))
-        print("PIV error propagation covariance matrices saved to file 'piv_covariance_matrices.json'")    
+        export_uncertainty(
+            peak_covariance,
+            geo_transform,
+            output_base_name)
 
 
 def show_piv_location(
+    before_height, after_height,
     before_axis, after_axis,
     hz_template_start, vt_template_start,
     hz_search_start, vt_search_start,
@@ -294,3 +282,35 @@ def propagate_correlation_into_subpixel_peak(
     subpixel_peak_covariance = np.matmul(jacobian, np.matmul(correlation_covariance, jacobian.T))
         
     return subpixel_peak_covariance
+
+
+def export_piv(
+    piv_origins,
+    piv_vectors,
+    geo_transform,
+    output_base_name):
+
+    # convert from pixels to ground distance
+    piv_origins = np.asarray(piv_origins)        
+    piv_origins *= geo_transform[0,0] # scale by pixel ground size
+    piv_origins[:,0] += geo_transform[0,2] # offset by leftmost pixel to get ground coordinate
+    piv_origins[:,1] = geo_transform[1,2] - piv_origins[:,1] # subtract from uppermost pixel to get ground coordinate
+    
+    piv_vectors = np.asarray(piv_vectors)
+    piv_vectors *= geo_transform[0,0] # scale by pixel ground size
+    
+    origins_vectors = np.concatenate((piv_origins, piv_vectors), axis=1)
+    json.dump(origins_vectors.tolist(), open(output_base_name + "_origins_vectors.json", "w"))
+    print("PIV origins and displacement vectors saved to file '{}_origins_vectors.json'".format(output_base_name))
+
+
+def export_uncertainty(
+    peak_covariance,
+    geo_transform,
+    output_base_name):
+
+    peak_covariance = np.asarray(peak_covariance)
+    peak_covariance *= geo_transform[0,0]**2
+
+    json.dump(peak_covariance.tolist(), open(output_base_name + "_covariance_matrices.json", "w"))
+    print("PIV displacement vector covariance matrices saved to file '{}_covariance_matrices.json'".format(output_base_name))
