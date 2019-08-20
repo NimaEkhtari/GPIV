@@ -77,12 +77,11 @@ def run_piv(
             vt_search_end = int(vt_count*step_size + search_size + (template_size % 2)) 
             height_search = after_height[vt_search_start:vt_search_end, hz_search_start:hz_search_end].copy()            
 
-            show_piv_location(
-                before_height, after_height,
-                before_axis, after_axis,
-                hz_template_start, vt_template_start,
-                hz_search_start, vt_search_start,
-                template_size, search_size)     
+            show_piv_location(before_height, after_height,
+                              before_axis, after_axis,
+                              hz_template_start, vt_template_start,
+                              hz_search_start, vt_search_start,
+                              template_size, search_size)     
 
             # flat template produces a divide by zero in normalized cross correlation
             if ((height_template.max() - height_template.min()) == 0): 
@@ -98,10 +97,9 @@ def run_piv(
                     correlation_max[1][0]==normalized_cross_correlation.shape[1]-1): 
                 continue
 
-            subpixel_peak = get_subpixel_peak(
-                normalized_cross_correlation[
-                    correlation_max[0][0]-1:correlation_max[0][0]+2,
-                    correlation_max[1][0]-1:correlation_max[1][0]+2])
+            subpixel_peak = get_subpixel_peak(normalized_cross_correlation[
+                correlation_max[0][0]-1:correlation_max[0][0]+2,
+                correlation_max[1][0]-1:correlation_max[1][0]+2])
             
             piv_origins.append(((hz_count*step_size + template_size - (1 - template_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
                                 (vt_count*step_size + template_size - (1 - template_size % 2)*0.5)))
@@ -132,17 +130,15 @@ def run_piv(
 
     plt.close(status_figure)
 
-    export_piv(
-        piv_origins,
-        piv_vectors,
-        geo_transform,
-        output_base_name)
+    export_piv(piv_origins,
+               piv_vectors,
+               geo_transform,
+               output_base_name)
 
     if propagate:
-        export_uncertainty(
-            peak_covariance,
-            geo_transform,
-            output_base_name)
+        export_uncertainty(peak_covariance,
+                           geo_transform,
+                           output_base_name)
 
 
 def show_piv_location(
@@ -208,7 +204,7 @@ def propagate_pixel_into_correlation(
 
     jacobian = get_correlation_jacobian(height_template, height_search, normalized_cross_correlation, numeric_partial_diff_increment)    
     # Propagate the template and search area errors into the 9 correlation elements
-    # The covariance order is by row of the ncc array (i.e., ncc[0,0], ncc[0,1], ncc[0,2], ncc[1,0], ncc[1,1], ...)
+    # The covariance order is by row of the normalized_cross_correlation (ncc) array (i.e., ncc[0,0], ncc[0,1], ncc[0,2], ncc[1,0], ncc[1,1], ...)
     correlation_covariance = np.matmul(jacobian,np.matmul(covariance_matrix,jacobian.T))
 
     return correlation_covariance
@@ -250,8 +246,8 @@ def get_correlation_jacobian(template,
                     perturbed_search_subarea_normalized_cross_correlation = np.sum(normalized_template * normalized_perturbed_search_subarea) / template.size
                     
                     # storage location adjustment by row_correlation and col_correlation accounts for the larger size of the search area than the template area
-                    template_partial_derivatives[row_template, col_template] = (perturbed_template_normalized_cross_correlation - ncc[row_correlation,col_correlation]) / numeric_partial_derivative_increment
-                    search_partial_derivatives[row_correlation+row_template, col_correlation+col_template] = (perturbed_search_subarea_normalized_cross_correlation - ncc[row_correlation, col_correlation]) / numeric_partial_derivative_increment 
+                    template_partial_derivatives[row_template, col_template] = (perturbed_template_normalized_cross_correlation - normalized_cross_correlation[row_correlation,col_correlation]) / numeric_partial_derivative_increment
+                    search_partial_derivatives[row_correlation+row_template, col_correlation+col_template] = (perturbed_search_subarea_normalized_cross_correlation - normalized_cross_correlation[row_correlation, col_correlation]) / numeric_partial_derivative_increment 
 
             # reshape the partial derivatives from their current array form to vector form and store in the Jacobian
             # we match the row-by-row pattern used to form the covariance matrix in the calling function
@@ -272,11 +268,11 @@ def propagate_correlation_into_subpixel_peak(
     # cycle through the 3x3 correlation array, row-by-row, and create the jacobian matrix
     for row_correlation in range(3):
         for col_correlation in range(3):
-            perturbed_correlation = ncc.copy()
+            perturbed_correlation = correlation.copy()
             perturbed_correlation[row_correlation,col_correlation] += numeric_partial_derivative_increment            
             perturbed_hz_delta, perturbed_vt_delta = get_subpixel_peak(perturbed_correlation)            
-            jacobian[0,row_correlation*3+col_correlation] = (perturbed_hz_delta - deltaUV[0]) / numeric_partial_derivative_increment
-            jacobian[1,row_correlation*3+col_correlation] = (perturbed_vt_delta - deltaUV[1]) / numeric_partial_derivative_increment
+            jacobian[0,row_correlation*3+col_correlation] = (perturbed_hz_delta - subpixel_peak[0]) / numeric_partial_derivative_increment
+            jacobian[1,row_correlation*3+col_correlation] = (perturbed_vt_delta - subpixel_peak[1]) / numeric_partial_derivative_increment
     
     # propagate the 3x3 array of correlation uncertainties into the sub-pixel U and V direction offsets
     subpixel_peak_covariance = np.matmul(jacobian, np.matmul(correlation_covariance, jacobian.T))

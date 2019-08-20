@@ -1,6 +1,8 @@
 import os
 import sys
 import piv_functions
+import json
+import numpy as np
 
 
 class Piv:
@@ -102,7 +104,7 @@ class Piv:
         )
 
         if not self.__propagate:
-            print('Computing PIV.')
+            print("Computing PIV.")
             piv_functions.run_piv(
                 before_height,
                 [],
@@ -112,12 +114,42 @@ class Piv:
                 self.__template_size,
                 self.__step_size,                
                 False,
-                self.output_base_name)
+                self.output_base_name
+            )
+            
+            # need to show results
+            
+        if self.__propagate:
+            print("Computing bias variance.")
+            piv_functions.run_piv(
+                before_height,
+                [],
+                before_height,
+                [],
+                geo_transform,
+                self.__template_size,
+                self.__step_size,                
+                False,
+                self.output_base_name
+            )
+            xy_bias_variance = get_bias_variance(self.output_base_name)
+
+            print("Computing PIV and propagating error.")
+            piv_functions.run_piv(
+                before_height,
+                before_uncertainty,
+                after_height,
+                after_uncertainty,
+                geo_transform,
+                self.__template_size,
+                self.__step_size,                
+                True,
+                self.output_base_name
+            )
+
+            print("Adding bias variance to propagated error.")
+            add_bias_variance(self.output_base_name, xy_bias_variance)
         
-            # # plot the displacement vectors on top of 'from' image       
-            # show(True, False, True, False, True, 1, False, 1)
-
-
 
 def is_positive_integer(n):
 	try:
@@ -126,4 +158,28 @@ def is_positive_integer(n):
 			return False
 	except ValueError:
 		return False
+
 	return True
+
+
+def get_bias_variance(output_base_name):
+    with open(output_base_name + "_origins_vectors.json", "r") as json_file:
+        origins_vectors = json.load(json_file)
+    origins_vectors = np.asarray(origins_vectors)
+
+    x_bias_variance = np.var(origins_vectors[:,2])
+    y_bias_variance = np.var(origins_vectors[:,3])
+
+    return [x_bias_variance, y_bias_variance]
+
+
+def add_bias_variance(output_base_name, xy_bias_variance):
+    with open(output_base_name + "_covariance_matrices.json", "r") as json_file:
+        covariance_matrices = json.load(json_file)
+    
+    for i in range(len(covariance_matrices)):
+        covariance_matrices[i][0][0] += xy_bias_variance[0]
+        covariance_matrices[i][1][1] += xy_bias_variance[1]
+    
+    json.dump(covariance_matrices, open(output_base_name + "_covariance_matrices.json", "w"))
+    
