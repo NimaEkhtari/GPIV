@@ -163,7 +163,7 @@ def is_positive_integer(n):
 
 
 def get_bias_variance(output_base_name):
-    with open(output_base_name + "_origins_vectors.json", "r") as json_file:
+    with open(output_base_name + "vectors.json", "r") as json_file:
         origins_vectors = json.load(json_file)
     origins_vectors = np.asarray(origins_vectors)
 
@@ -174,12 +174,12 @@ def get_bias_variance(output_base_name):
 
 
 def add_bias_variance(output_base_name, xy_bias_variance):
-    with open(output_base_name + "_covariance_matrices.json", "r") as json_file:
+    with open(output_base_name + "covariances.json", "r") as json_file:
         covariance_matrices = json.load(json_file)
     
     for i in range(len(covariance_matrices)):
-        covariance_matrices[i][0][0] += xy_bias_variance[0]
-        covariance_matrices[i][1][1] += xy_bias_variance[1]
+        covariance_matrices[i][1][0][0] += xy_bias_variance[0]
+        covariance_matrices[i][1][1][1] += xy_bias_variance[1]
     
-    json.dump(covariance_matrices, open(output_base_name + "_covariance_matrices.json", "w"))
+    json.dump(covariance_matrices, open(output_base_name + "covariances.json", "w"))
     

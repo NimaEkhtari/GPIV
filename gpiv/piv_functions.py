@@ -130,14 +130,12 @@ def run_piv(
 
     plt.close(status_figure)
 
-    export_piv(piv_origins,
-               piv_vectors,
-               geo_transform,
-               output_base_name)
+    export_piv(piv_origins, piv_vectors,
+               geo_transform, output_base_name)
 
     if propagate:
-        export_uncertainty(peak_covariance,
-                           geo_transform,
+        export_uncertainty(piv_origins, piv_vectors,
+                           peak_covariance, geo_transform, 
                            output_base_name)
 
 
@@ -286,27 +284,44 @@ def export_piv(
     geo_transform,
     output_base_name):
 
-    # convert from pixels to ground distance
+    # Convert from pixels to ground distance
     piv_origins = np.asarray(piv_origins)        
-    piv_origins *= geo_transform[0,0] # scale by pixel ground size
-    piv_origins[:,0] += geo_transform[0,2] # offset by leftmost pixel to get ground coordinate
-    piv_origins[:,1] = geo_transform[1,2] - piv_origins[:,1] # subtract from uppermost pixel to get ground coordinate
-    
+    piv_origins *= geo_transform[0,0]  # Scale by pixel ground size
+    piv_origins[:,0] += geo_transform[0,2]  # Offset by leftmost pixel to get ground coordinate
+    piv_origins[:,1] = geo_transform[1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate    
     piv_vectors = np.asarray(piv_vectors)
-    piv_vectors *= geo_transform[0,0] # scale by pixel ground size
+    piv_vectors *= geo_transform[0,0]  # Scale by pixel ground size
     
     origins_vectors = np.concatenate((piv_origins, piv_vectors), axis=1)
-    json.dump(origins_vectors.tolist(), open(output_base_name + "_origins_vectors.json", "w"))
-    print("PIV origins and displacement vectors saved to file '{}_origins_vectors.json'".format(output_base_name))
+    json.dump(origins_vectors.tolist(), open(output_base_name + "vectors.json", "w"))
+    print("PIV displacement vectors saved to file '{}vectors.json'".format(output_base_name))
 
 
-def export_uncertainty(
-    peak_covariance,
-    geo_transform,
-    output_base_name):
+def export_uncertainty(piv_origins,
+                       piv_vectors,
+                       peak_covariance,
+                       geo_transform,
+                       output_base_name):
 
+    # Convert from pixels to ground distance
+    piv_origins = np.asarray(piv_origins)        
+    piv_origins *= geo_transform[0,0]  # Scale by pixel ground size
+    piv_origins[:,0] += geo_transform[0,2]  # Offset by leftmost pixel to get ground coordinate
+    piv_origins[:,1] = geo_transform[1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate
+    piv_vectors = np.asarray(piv_vectors)
+    piv_vectors *= geo_transform[0,0]  # Scale by pixel ground size
     peak_covariance = np.asarray(peak_covariance)
-    peak_covariance *= geo_transform[0,0]**2
+    peak_covariance *= geo_transform[0,0]**2  # Scale by squared pixel ground size
 
-    json.dump(peak_covariance.tolist(), open(output_base_name + "_covariance_matrices.json", "w"))
-    print("PIV displacement vector covariance matrices saved to file '{}_covariance_matrices.json'".format(output_base_name))
+    piv_end_location = piv_origins
+    piv_end_location[:,0] += piv_vectors[:,0]     
+    piv_end_location[:,1] -= piv_vectors[:,1]  # Subtract to convert from dV (positive down) to dY (positive up)
+
+    piv_end_location = piv_end_location.tolist()
+    peak_covariance = peak_covariance.tolist()
+    locations_covariances = []
+    for i in range(len(piv_end_location)):
+        locations_covariances.append([piv_end_location[i], peak_covariance[i]])
+
+    json.dump(locations_covariances, open(output_base_name + "covariances.json", "w"))
+    print("PIV covariance matrices saved to file '{}covariances.json'".format(output_base_name))
