@@ -5,6 +5,7 @@ import numpy as np
 import math
 from matplotlib.patches import FancyArrow
 from matplotlib.patches import Ellipse
+from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import json
 
@@ -105,6 +106,7 @@ def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
     plot_width_in_pixels = axes.get_window_extent().width
     plot_width_in_ground_units = image_geo_extents[1] - image_geo_extents[0]
     pixels_per_ground_unit = plot_width_in_pixels / plot_width_in_ground_units
+    ground_units_per_pixel = plot_width_in_ground_units / plot_width_in_pixels
 
     semimajor_lengths_ground = []
     semimajor_lengths_pixels = []
@@ -112,9 +114,7 @@ def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
         eigenvalues, eigenvectors = np.linalg.eig(locations_covariances[i][1])
         max_index = np.argmax(eigenvalues)
         semimajor_lengths_ground.append(math.sqrt(2.298*eigenvalues[max_index]))
-        semimajor_lengths_pixels.append(math.sqrt(2.298*eigenvalues[max_index])
-                                       * pixels_per_ground_unit)
-    ellipse_scale_factor = 15 / np.median(semimajor_lengths_pixels)
+    ellipse_scale_factor = (15*ground_units_per_pixel) / np.median(semimajor_lengths_ground)
 
     for i in range(len(locations_covariances)):
         eigenvalues, eigenvectors = np.linalg.eig(locations_covariances[i][1])
@@ -132,20 +132,37 @@ def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
             ec='red'
         )
         axes.add_artist(ellipse)
+        # print('semimajor={}.'.format(semimajor * ellipse_scale_factor * user_scale_factor * pixels_per_ground_unit))
+        # print('semiminor={}.'.format(semiminor * ellipse_scale_factor * user_scale_factor))
 
-    scale_bar_length = (np.median(semimajor_lengths_ground)
-                        * ellipse_scale_factor
-                        * user_scale_factor
-                        * 2)
-    scale_bar = AnchoredSizeBar(
-        axes.transData,
-        scale_bar_length,
-        'Ellipses: {:.3f} ground units'.format(np.median(semimajor_lengths_ground) * 2),
-        3,
-        pad=0.5,
-        borderpad=0.5,
-        sep=6,
-        frameon=True,
-        size_vertical=1,
-    )
-    axes.add_artist(scale_bar)
+    print(image_geo_extents)
+    rect = Rectangle((image_geo_extents[0],image_geo_extents[3]), 50, 50, fc='silver', clip_on=False)
+    axes.add_artist(rect)
+    ell = Ellipse((image_geo_extents[0]+25,image_geo_extents[3]+25), 15*ground_units_per_pixel, 15*ground_units_per_pixel, ec='red', fc='none', clip_on=False)
+    axes.add_artist(ell)
+
+    # scale_bar_length = (np.median(semimajor_lengths_ground)
+    #                     * ellipse_scale_factor
+    #                     * user_scale_factor
+    #                     * 2)
+    # scale_bar = AnchoredSizeBar(
+    #     axes.transData,
+    #     scale_bar_length,
+    #     'Ellipses: {:.3f} ground units'.format(np.median(semimajor_lengths_ground) * 2),
+    #     loc='lower left',
+    #     pad=0.5,
+    #     borderpad=0.5,
+    #     sep=6,
+    #     frameon=True,
+    #     size_vertical=1
+    # )
+    # axes.add_artist(scale_bar)
+
+    # from mpl_toolkits.axes_grid1.anchored_artists import AnchoredDrawingArea
+    # ada = AnchoredDrawingArea(30, 30, 0, 0, loc='upper right')
+    # e = Ellipse((15,15),
+    #             10,
+    #             30,
+    #             angle=0, fc='none', ec='red')
+    # ada.da.add_artist(e)
+    # axes.add_artist(ada)
