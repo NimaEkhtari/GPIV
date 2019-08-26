@@ -6,7 +6,6 @@ import math
 from matplotlib.patches import FancyArrow
 from matplotlib.patches import Ellipse
 from matplotlib.patches import Rectangle
-from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import json
 
 
@@ -61,11 +60,13 @@ def plot_vectors(axes, image_geo_extents, vector_file, user_scale_factor):
     plot_width_in_pixels = axes.get_window_extent().width
     plot_width_in_ground_units = image_geo_extents[1] - image_geo_extents[0]
     pixels_per_ground_unit = plot_width_in_pixels / plot_width_in_ground_units
+    ground_units_per_pixel = plot_width_in_ground_units / plot_width_in_pixels
 
     vector_lengths_ground = np.linalg.norm(origins_vectors_numpy[:,2:], axis=1)
     vector_lengths_pixels = vector_lengths_ground * pixels_per_ground_unit
-    arrow_scale_factor = 20 / np.median(vector_lengths_pixels)
-    arrow_head_scale_factor = 10 / pixels_per_ground_unit
+
+    arrow_scale_factor = (30*ground_units_per_pixel) / np.median(vector_lengths_ground)
+    arrow_head_scale_factor = 10*ground_units_per_pixel
 
     for i in range(len(origins_vectors)):
         arrow = FancyArrow(
@@ -77,25 +78,26 @@ def plot_vectors(axes, image_geo_extents, vector_file, user_scale_factor):
             head_width=arrow_head_scale_factor,
             overhang=0.8,
             fc='yellow',
-            ec = 'yellow')
+            ec = 'yellow'
+        )
         axes.add_artist(arrow)
-
-    scale_bar_length = (np.median(vector_lengths_ground)
-                        * arrow_scale_factor
-                        * user_scale_factor
-                        * 2)
-    scale_bar = AnchoredSizeBar(
-        axes.transData,
-        scale_bar_length,
-        'Vectors: {:.3f} ground units'.format(np.median(vector_lengths_ground) * 2),
-        4,
-        pad=0.5,
-        borderpad=0.5,
-        sep=6,
-        frameon=True,
-        size_vertical=1
-    )
-    axes.add_artist(scale_bar)
+    
+    geo_height = image_geo_extents[3] - image_geo_extents[2]
+    legend_background = Rectangle((image_geo_extents[0] + geo_height/50, image_geo_extents[2] + geo_height/50),
+                        geo_height/7, geo_height/7, 
+                        fc='silver', clip_on=False, alpha=0.5)    
+    axes.add_artist(legend_background)
+    plt.text(image_geo_extents[0] + geo_height/50 + geo_height/14,
+             image_geo_extents[2] + geo_height/7,
+             '{0:.3f}'.format(np.median(vector_lengths_ground)),
+             horizontalalignment='center', verticalalignment='top')
+    arrow = FancyArrow(
+        image_geo_extents[0] + geo_height/50 + (geo_height/7 - 30*ground_units_per_pixel)/2,
+        image_geo_extents[2] + geo_height/14,
+        30*ground_units_per_pixel, 0,
+        length_includes_head=True, head_width=arrow_head_scale_factor,
+        overhang=0.8, fc='yellow', ec = 'yellow')
+    axes.add_artist(arrow)
 
 
 def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
@@ -114,7 +116,7 @@ def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
         eigenvalues, eigenvectors = np.linalg.eig(locations_covariances[i][1])
         max_index = np.argmax(eigenvalues)
         semimajor_lengths_ground.append(math.sqrt(2.298*eigenvalues[max_index]))
-    ellipse_scale_factor = (15*ground_units_per_pixel) / np.median(semimajor_lengths_ground)
+    ellipse_scale_factor = (20*ground_units_per_pixel) / np.median(semimajor_lengths_ground)
 
     for i in range(len(locations_covariances)):
         eigenvalues, eigenvectors = np.linalg.eig(locations_covariances[i][1])
@@ -132,37 +134,17 @@ def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
             ec='red'
         )
         axes.add_artist(ellipse)
-        # print('semimajor={}.'.format(semimajor * ellipse_scale_factor * user_scale_factor * pixels_per_ground_unit))
-        # print('semiminor={}.'.format(semiminor * ellipse_scale_factor * user_scale_factor))
 
-    print(image_geo_extents)
-    rect = Rectangle((image_geo_extents[0],image_geo_extents[3]), 50, 50, fc='silver', clip_on=False)
-    axes.add_artist(rect)
-    ell = Ellipse((image_geo_extents[0]+25,image_geo_extents[3]+25), 15*ground_units_per_pixel, 15*ground_units_per_pixel, ec='red', fc='none', clip_on=False)
+    geo_height = image_geo_extents[3] - image_geo_extents[2]
+    legend_background = Rectangle((image_geo_extents[0] + geo_height/50 + geo_height/7 + geo_height/50,
+                                   image_geo_extents[2] + geo_height/50),
+                                   geo_height/7, geo_height/7, fc='silver', clip_on=False, alpha=0.5)
+    axes.add_artist(legend_background)
+    plt.text(image_geo_extents[0] + geo_height/50 + geo_height/7 + geo_height/50 + geo_height/14,
+             image_geo_extents[2] + geo_height/7,
+             '{0:.3f}'.format(np.median(semimajor_lengths_ground)),
+             horizontalalignment='center', verticalalignment='top')
+    ell = Ellipse((image_geo_extents[0] + geo_height/50 + geo_height/7 + geo_height/50 + geo_height/14, image_geo_extents[2] + geo_height/14),
+                   20*ground_units_per_pixel, 20*ground_units_per_pixel, 
+                   ec='red', fc='none', clip_on=False)
     axes.add_artist(ell)
-
-    # scale_bar_length = (np.median(semimajor_lengths_ground)
-    #                     * ellipse_scale_factor
-    #                     * user_scale_factor
-    #                     * 2)
-    # scale_bar = AnchoredSizeBar(
-    #     axes.transData,
-    #     scale_bar_length,
-    #     'Ellipses: {:.3f} ground units'.format(np.median(semimajor_lengths_ground) * 2),
-    #     loc='lower left',
-    #     pad=0.5,
-    #     borderpad=0.5,
-    #     sep=6,
-    #     frameon=True,
-    #     size_vertical=1
-    # )
-    # axes.add_artist(scale_bar)
-
-    # from mpl_toolkits.axes_grid1.anchored_artists import AnchoredDrawingArea
-    # ada = AnchoredDrawingArea(30, 30, 0, 0, loc='upper right')
-    # e = Ellipse((15,15),
-    #             10,
-    #             30,
-    #             angle=0, fc='none', ec='red')
-    # ada.da.add_artist(e)
-    # axes.add_artist(ada)
