@@ -6,6 +6,53 @@ import matplotlib.pyplot as plt
 import matplotlib.patches
 import math
 import json
+import show_functions
+
+
+def piv(before_height_file, after_height_file,
+        template_size, step_size,
+        before_uncertainty_file, after_uncertainty_file,
+        propagate, output_base_name):
+
+    (before_height, before_uncertainty, 
+     after_height, after_uncertainty, 
+     geo_transform) = get_image_arrays(before_height_file,
+                                       before_uncertainty_file,
+                                       after_height_file,
+                                       after_uncertainty_file,
+                                       propagate)
+
+    if not propagate:
+        print("Computing PIV.")
+        run_piv(before_height, [],
+                after_height, [],
+                geo_transform, template_size, step_size,
+                False, output_base_name)
+        show_functions.show(before_height_file,
+                            output_base_name + 'vectors.json',
+                            None,
+                            1, 1)
+    else:
+        print("Computing bias variance.")
+        run_piv(before_height, [],
+                before_height, [],
+                geo_transform, template_size, step_size,
+                False, output_base_name)
+        xy_bias_variance = get_bias_variance(output_base_name)
+
+        print("Computing PIV and propagating uncertainty.")
+        run_piv(before_height, before_uncertainty,
+                after_height, after_uncertainty,
+                geo_transform, template_size, step_size,
+                True, output_base_name)
+
+        print("Adding bias variance to propagated PIV uncertainty.")
+        add_bias_variance(output_base_name, xy_bias_variance)
+
+        show_functions.show(before_height_file,
+                            output_base_name + 'vectors.json',
+                            output_base_name + 'covariances.json',
+                            1, 1)
 
 
 def get_image_arrays(
@@ -37,16 +84,10 @@ def get_image_arrays(
     return before_height, before_uncertainty, after_height, after_uncertainty, before_geo_transform
 
 
-def run_piv(
-    before_height, 
-    before_uncertainty, 
-    after_height, 
-    after_uncertainty, 
-    geo_transform, 
-    template_size, 
-    step_size, 
-    propagate,
-    output_base_name):
+def run_piv(before_height, before_uncertainty,
+            after_height, after_uncertainty,
+            geo_transform, template_size,
+            step_size, propagate, output_base_name):
     
     piv_origins = []
     piv_vectors = []
@@ -325,3 +366,25 @@ def export_uncertainty(piv_origins,
 
     json.dump(locations_covariances, open(output_base_name + "covariances.json", "w"))
     print("PIV covariance matrices saved to file '{}covariances.json'".format(output_base_name))
+
+
+def get_bias_variance(output_base_name):
+    with open(output_base_name + "vectors.json", "r") as json_file:
+        origins_vectors = json.load(json_file)
+    origins_vectors = np.asarray(origins_vectors)
+
+    x_bias_variance = np.var(origins_vectors[:,2])
+    y_bias_variance = np.var(origins_vectors[:,3])
+
+    return [x_bias_variance, y_bias_variance]
+
+
+def add_bias_variance(output_base_name, xy_bias_variance):
+    with open(output_base_name + "covariances.json", "r") as json_file:
+        covariance_matrices = json.load(json_file)
+    
+    for i in range(len(covariance_matrices)):
+        covariance_matrices[i][1][0][0] += xy_bias_variance[0]
+        covariance_matrices[i][1][1][1] += xy_bias_variance[1]
+    
+    json.dump(covariance_matrices, open(output_base_name + "covariances.json", "w"))

@@ -1,0 +1,7 @@
+Easy To-Do: 
+1. Check that the 'from' and 'to' rasters have the same cell size and spatially overlap when calling PIV
+
+Not so Easy To-Do:
+1. Elegantly handle missing pixels or NaN values. Numpy nan values produce nan correlation (skimage match_template) results. This is an issue near data boundaries and data gaps.
+2. Store the ratio of highest to second highest correlation peak as a measure of solution strength
+3. Add ability to define a processing boundary

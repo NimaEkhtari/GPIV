@@ -9,18 +9,20 @@ from matplotlib.patches import Rectangle
 import json
 
 
-def show(image_file, vector_file=None, ellipse_file=None, scale_factor=None):
+def show(image_file, vector_file, ellipse_file, vector_scale_factor, ellipse_scale_factor):
 
     (image_array,image_geo_extents, image_geo_transform) = get_image_array(image_file)
     (figure, axes) = plot_image(image_array, image_geo_extents)
 
-    if scale_factor is None:
-        scale_factor = 1
-    if ellipse_file is not None:
-        plot_ellipses(axes, image_geo_extents, ellipse_file, float(scale_factor))
     if vector_file is not None:
-        plot_vectors(axes, image_geo_extents, vector_file, float(scale_factor))
-    
+        if vector_scale_factor is None:
+            vector_scale_factor = 1
+        plot_vectors(axes, image_geo_extents, vector_file, vector_scale_factor)
+    if ellipse_file is not None:
+        if ellipse_scale_factor is None:
+            ellipse_scale_factor = 1
+        plot_ellipses(axes, image_geo_extents, ellipse_file, ellipse_scale_factor)
+
     plt.show()
 
 
@@ -89,7 +91,7 @@ def plot_vectors(axes, image_geo_extents, vector_file, user_scale_factor):
     axes.add_artist(legend_background)
     plt.text(image_geo_extents[0] + geo_height/50 + geo_height/14,
              image_geo_extents[2] + geo_height/7,
-             '{0:.3f}'.format(np.median(vector_lengths_ground)),
+             '{0:.3f}'.format(np.median(vector_lengths_ground)/user_scale_factor),
              horizontalalignment='center', verticalalignment='top')
     arrow = FancyArrow(
         image_geo_extents[0] + geo_height/50 + (geo_height/7 - 30*ground_units_per_pixel)/2,
@@ -142,7 +144,7 @@ def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
     axes.add_artist(legend_background)
     plt.text(image_geo_extents[0] + geo_height/50 + geo_height/7 + geo_height/50 + geo_height/14,
              image_geo_extents[2] + geo_height/7,
-             '{0:.3f}'.format(np.median(semimajor_lengths_ground)),
+             '{0:.3f}'.format(np.median(semimajor_lengths_ground)/user_scale_factor),
              horizontalalignment='center', verticalalignment='top')
     ell = Ellipse((image_geo_extents[0] + geo_height/50 + geo_height/7 + geo_height/50 + geo_height/14, image_geo_extents[2] + geo_height/14),
                    20*ground_units_per_pixel, 20*ground_units_per_pixel, 
