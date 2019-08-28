@@ -24,4 +24,4 @@ An image showing the results from PIV and uncertainty propagation applied to Can
 * `gpiv piv example_data/height_2001.tif example_data/height_2015.tif 40 40 --prop example_data/uncertainty_2001.tif example_data/uncertainty_2015.tif`
 * `gpiv pivshow example_data/uncertainty_2001.tif --vec vectors.json --ell covariances.json --ellscale 0.75`
 
-![Example GPIV Results](example.png)
+![Example GPIV Results](example_data/example.png)
