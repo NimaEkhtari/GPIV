@@ -1,32 +1,27 @@
 # GPIV - Geospatial Particle Imaging Velocimetry
 
 ## Description
-There are plenty of PIV applications out there, but none focused on the geospatial community with built in error propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to certain PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. As of now, GPIV can:
+There are plenty of PIV (image correlation) applications out there, but none focused on the geospatial community and none with built-in uncertainty propagation. Hence, GPIV. GPIV is a command line tool that generates horizontal displacment vectors from two temporally spaced digital elevation models (DEMs) where some type of horizontal motion has occurred between the data collections. In contrast to certain PIV applications that restrict (or convert) input images to 8-bit integer format, GPIV natively operates on floating point values. This makes it realistic to use DEMs with more than a few tens of meters of topographic relief. As of now, GPIV can:
 
-* Rasterize a lidar point cloud to a height raster and error raster (more on the error raster below).
-* Generate 2D displacement vectors from two height rasters via the PIV method.
-* Propagate pixel error (from the error raster) into the 2D displacement vectors.
-* Display resulting PIV vectors and propagated error ellipses on either a height raster or error raster.  
-
-The error raster that GPIV currently produces when rasterizing a lidar point cloud is simply the the standard deviation of lidar point elevations within each raster cell. This is not correct, but it provides a way to test the error propagation for now.
+* Generate 2D displacement vectors from pre- and post-event DEMs via image correlation.
+* Propagate pre- and post-event DEM uncertainties (contained in images of the same size as the DEMs) into the 2D displacement vectors.
+* Display the computed displacement vectors and propagated uncertainty ellipses on a background image.  
 
 ## Status
-I'm not sure this is even in Beta stage yet. The PIV and error propagation works, but the PIV is very basic (single pass, no window deformation) and the error propagation is slooow. There are no tests yet.
-
-Next steps in development will be validating the error propagation on synthetic data, looking at the error propagation speed problem, and then taking a first stab at what appears to be a difficult question: "How do we estimate the vertical uncertainty in each cell of a DEM generated from lidar data?". This question needs to be answered in order to generate correct estimates of the PIV displacement errors. And somewhere in the midst of this I need to figure out how to package this sucker so users can do a `conda install gpiv` or similar. Also need to standardize things to PEP8.
+* Version = 0.1
+* Recent testing has indicated the propagated uncertainties are correct for simple translations between the pre- and post-event DEMs. However, the propagated uncertainties are too small when a DEM undergoes distortion, which is more realistic. This may be a result of not using a multi-pass deforming window approach, which is the next item on the agenda.
+* No automated tests yet, which is probably a silly statement considering the project is a lot of scratchwork thus far, but it is a practice I need to learn.
+* The uncertainty propagation is still slow, though better than in Version 0.0. 
+* The ELEPHANT in the room is how to generate statistically valid DEM uncertainties (that can be generated with minimal user interaction) for the propagation. Once the uncertainty propagation is fully validated, this will be the next order of business. 
 
 ## Usage
-### Dependencies
-Use the `environment.yml` file to create a new environment with all the dependencies: `conda env create -f  environment.yml`.
+* I use Conda for my Python environments. Use the `gpiv.yml` file to create a new environment with all the required dependencies: `conda env create -f  gpiv.yml`.
+* Run `pip install` from within the `gpiv` directory to install GPIV.
+* Type `gpiv --help` to see available commands and options. Type `gpiv piv --help` for PIV arguments and options and `gpiv pivshow --help` for arguments and options for plotting the PIV results.
 
-### Command Line
-* Type `python gpiv.py --help` to see available commands and options. 
-* You will notice a lot of 'from' and 'to' verbiage. 'From' indicates the older data, whereas 'to' indicates the newer data. The vectors will point from the older data to the newer data. 
-* GPIV stores rasters in geotiff format in the working directory (which is gpiv/gpiv for now since we are working with the source files, i.e., this is not at package install) with specific names. Displacement vectors and associated covariance matrices are exported in JSON format to the working directory as well. Don't rename the files since GPIV relies on their given names. Copy them to a new place if you want to save a particular version of the results.
+## Example Application
+An image showing the results from PIV and uncertainty propagation applied to Canada Glacier (Antarctica) motion between 2001 and 2015 is shown below. The displacement vectors are valid, but the absolute magnitudes of the uncertainty ellipses are not. However, the relative magnitudes and orientations of the ellipses are likely good estimates. The reason for the "incorrect" results is that the DEM uncertainties were generated from the standard deviation of the lidar points falling within each DEM grid cell, which is just a simplistic roughness estimate. Note that the background image is the roughness estimate. You can replicate the results using the DEM and uncertainty images in the `example_data` directory and running the following two commands:
+* `gpiv piv example_data/height_2001.tif example_data/height_2015.tif 40 40 --prop example_data/uncertainty_2001.tif example_data/uncertainty_2015.tif`
+* `gpiv pivshow example_data/uncertainty_2001.tif --vec vectors.json --ell covariances.json --ellscale 0.75`
 
-## Rudimentary Example
-* Canada glacier.
-* Displacment vectors (green) are scaled by a factor of 5.
-* Error ellipses (red) are 1-sigma and scaled by a factor of 20.
-
-![Rudimentary PIV](rudimentaryPIV.png)
+![Example GPIV Results](example.png)

@@ -68,7 +68,7 @@ def plot_vectors(axes, image_geo_extents, vector_file, user_scale_factor):
     vector_lengths_pixels = vector_lengths_ground * pixels_per_ground_unit
 
     arrow_scale_factor = (30*ground_units_per_pixel) / np.median(vector_lengths_ground)
-    arrow_head_scale_factor = 10*ground_units_per_pixel
+    arrow_head_scale_factor = 8*ground_units_per_pixel
 
     for i in range(len(origins_vectors)):
         arrow = FancyArrow(
@@ -87,7 +87,7 @@ def plot_vectors(axes, image_geo_extents, vector_file, user_scale_factor):
     geo_height = image_geo_extents[3] - image_geo_extents[2]
     legend_background = Rectangle((image_geo_extents[0] + geo_height/50, image_geo_extents[2] + geo_height/50),
                         geo_height/7, geo_height/7, 
-                        fc='silver', clip_on=False, alpha=0.5)    
+                        fc='silver', clip_on=False, alpha=0.75)    
     axes.add_artist(legend_background)
     plt.text(image_geo_extents[0] + geo_height/50 + geo_height/14,
              image_geo_extents[2] + geo_height/7,
@@ -140,7 +140,7 @@ def plot_ellipses(axes, image_geo_extents, ellipse_file, user_scale_factor):
     geo_height = image_geo_extents[3] - image_geo_extents[2]
     legend_background = Rectangle((image_geo_extents[0] + geo_height/50 + geo_height/7 + geo_height/50,
                                    image_geo_extents[2] + geo_height/50),
-                                   geo_height/7, geo_height/7, fc='silver', clip_on=False, alpha=0.5)
+                                   geo_height/7, geo_height/7, fc='silver', clip_on=False, alpha=0.75)
     axes.add_artist(legend_background)
     plt.text(image_geo_extents[0] + geo_height/50 + geo_height/7 + geo_height/50 + geo_height/14,
              image_geo_extents[2] + geo_height/7,
