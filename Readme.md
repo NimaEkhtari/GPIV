@@ -16,7 +16,7 @@ There are plenty of PIV (image correlation) applications out there, but none foc
 
 ## Usage
 * I use Conda for my Python environments. Use the `gpiv.yml` file to create a new environment with all the required dependencies: `conda env create -f  gpiv.yml`.
-* Run `pip install` from within the `gpiv` directory to install GPIV.
+* Run `pip install .` from within the `gpiv` directory to install GPIV.
 * Type `gpiv --help` to see available commands and options. Type `gpiv piv --help` for PIV arguments and options and `gpiv pivshow --help` for arguments and options for plotting the PIV results.
 
 ## Example Application
