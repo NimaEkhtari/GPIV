@@ -21,6 +21,7 @@ There are plenty of PIV (image correlation) applications out there, but none foc
 
 ## Example Application
 An image showing the results from PIV and uncertainty propagation applied to Canada Glacier (Antarctica) motion between 2001 and 2015 is shown below. The displacement vectors are valid, but the absolute magnitudes of the uncertainty ellipses are not. However, the relative magnitudes and orientations of the ellipses are likely good estimates. The reason for the "incorrect" results is that the DEM uncertainties were generated from the standard deviation of the lidar points falling within each DEM grid cell, which is just a simplistic roughness estimate. Note that the background image is the roughness estimate. You can replicate the results using the DEM and uncertainty images in the `example_data` directory and running the following two commands:
+
 * `gpiv piv example_data/height_2001.tif example_data/height_2015.tif 40 40 --prop example_data/uncertainty_2001.tif example_data/uncertainty_2015.tif`
 * `gpiv pivshow example_data/uncertainty_2001.tif --vec vectors.json --ell covariances.json --ellscale 0.75`
 
