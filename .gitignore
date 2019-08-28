@@ -5,3 +5,4 @@
 /dist/
 /*.egg-info
 *.json
+!/example_data/*.tif
