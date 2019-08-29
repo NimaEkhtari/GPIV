@@ -15,7 +15,7 @@ There are plenty of PIV (image correlation) applications out there, but none foc
 * The ELEPHANT in the room is how to generate statistically valid DEM uncertainties (that can be generated with minimal user interaction) for the propagation. Once the uncertainty propagation is fully validated, this will be the next order of business. 
 
 ## Installation
-* Clone this repository: `git clone git clone git@bitbucket.org:pjh172/gpiv.git` or `git clone git clone https://pjh172@bitbucket.org/pjh172/gpiv.git`.
+* Clone this repository: `git clone git@bitbucket.org:pjh172/gpiv.git` or `git clone https://pjh172@bitbucket.org/pjh172/gpiv.git`.
 * I use Conda for my Python environments. Use the `gpiv.yml` file to create a new environment with all the required dependencies: `conda env create -f  gpiv.yml`.
 * Run `pip install .` from within the `gpiv` directory to install GPIV.
 * Type `gpiv --help` to see available commands and options. Type `gpiv piv --help` for PIV arguments and options and `gpiv pivshow --help` for arguments and options for plotting the PIV results.
