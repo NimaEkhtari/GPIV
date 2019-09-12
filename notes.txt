@@ -4,4 +4,5 @@ Easy To-Do:
 Not so Easy To-Do:
 1. Elegantly handle missing pixels or NaN values. Numpy nan values produce nan correlation (skimage match_template) results. This is an issue near data boundaries and data gaps.
 2. Store the ratio of highest to second highest correlation peak as a measure of solution strength
-3. Add ability to define a processing boundary
+3. Local median filter on vectors to identify potential outliers.
+4. Add ability to define a processing boundary
