@@ -63,5 +63,5 @@ def pivshow(background_image, vec, ell, vecscale, ellscale):
 cli.add_command(piv)
 cli.add_command(pivshow)
 
-# if __name__ == '__main__':
-#     cli()
+if __name__ == '__main__':
+    cli()
