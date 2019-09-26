@@ -124,28 +124,32 @@ def run_piv(before_height, before_uncertainty,
                               hz_search_start, vt_search_start,
                               template_size, search_size)     
 
-            # flat template produces a divide by zero in normalized cross correlation
-            if ((height_template.max() - height_template.min()) == 0): 
+            # guard against flat areas, which produce a divide by zero in the correlation
+            # guard agains NaN values, which breaks scipy's match_template function
+            if (np.max(height_template)-np.min(height_template) < 1e-10 or
+                    np.max(height_search)-np.min(height_search) < 1e-10 or
+                    np.isnan(height_template).any() or
+                    np.isnan(height_search).any()):
                 continue
 
             normalized_cross_correlation = match_template(height_search, height_template) # uses FFT based correlation
-            correlation_max = np.where(normalized_cross_correlation == np.amax(normalized_cross_correlation))
+            correlation_max_idx = np.where(normalized_cross_correlation == np.max(normalized_cross_correlation))
 
             # peak location on edges of correlation matrix breaks sub-pixel peak interpolation
-            if (correlation_max[0][0]==0 or
-                    correlation_max[1][0]==0 or 
-                    correlation_max[0][0]==normalized_cross_correlation.shape[0]-1 or 
-                    correlation_max[1][0]==normalized_cross_correlation.shape[1]-1): 
+            if (correlation_max_idx[0][0]==0 or
+                    correlation_max_idx[1][0]==0 or 
+                    correlation_max_idx[0][0]==normalized_cross_correlation.shape[0]-1 or 
+                    correlation_max_idx[1][0]==normalized_cross_correlation.shape[1]-1): 
                 continue
 
             subpixel_peak = get_subpixel_peak(normalized_cross_correlation[
-                correlation_max[0][0]-1:correlation_max[0][0]+2,
-                correlation_max[1][0]-1:correlation_max[1][0]+2])
+                correlation_max_idx[0][0]-1:correlation_max_idx[0][0]+2,
+                correlation_max_idx[1][0]-1:correlation_max_idx[1][0]+2])
             
             piv_origins.append(((hz_count*step_size + template_size - (1 - template_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
                                 (vt_count*step_size + template_size - (1 - template_size % 2)*0.5)))
-            piv_vectors.append(((correlation_max[1][0] - math.ceil(template_size/2) + subpixel_peak[0]),
-                                (correlation_max[0][0] - math.ceil(template_size/2) + subpixel_peak[1])))
+            piv_vectors.append(((correlation_max_idx[1][0] - math.ceil(template_size/2) + subpixel_peak[0]),
+                                (correlation_max_idx[0][0] - math.ceil(template_size/2) + subpixel_peak[1])))
 
             if propagate:
                 uncertainty_template = before_uncertainty[vt_template_start:vt_template_end, hz_template_start:hz_template_end].copy()
@@ -155,14 +159,14 @@ def run_piv(before_height, before_uncertainty,
                 correlation_covariance = propagate_pixel_into_correlation(
                     height_template,
                     uncertainty_template, 
-                    height_search[correlation_max[0][0]-1:correlation_max[0][0]+template_size+1, correlation_max[1][0]-1:correlation_max[1][0]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search array,
-                    uncertainty_search[correlation_max[0][0]-1:correlation_max[0][0]+template_size+1, correlation_max[1][0]-1:correlation_max[1][0]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search error array
-                    normalized_cross_correlation[correlation_max[0][0]-1:correlation_max[0][0]+2, correlation_max[1][0]-1:correlation_max[1][0]+2], # 3x3 array of correlation values centered on the correlation peak
+                    height_search[correlation_max_idx[0][0]-1:correlation_max_idx[0][0]+template_size+1, correlation_max_idx[1][0]-1:correlation_max_idx[1][0]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search array,
+                    uncertainty_search[correlation_max_idx[0][0]-1:correlation_max_idx[0][0]+template_size+1, correlation_max_idx[1][0]-1:correlation_max_idx[1][0]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search error array
+                    normalized_cross_correlation[correlation_max_idx[0][0]-1:correlation_max_idx[0][0]+2, correlation_max_idx[1][0]-1:correlation_max_idx[1][0]+2], # 3x3 array of correlation values centered on the correlation peak
                     numeric_partial_derivative_increment) 
 
                 # propagate the correlation covariance into the subpixel peak location
                 subpixel_peak_covariance = propagate_correlation_into_subpixel_peak(
-                    normalized_cross_correlation[correlation_max[0][0]-1:correlation_max[0][0]+2, correlation_max[1][0]-1:correlation_max[1][0]+2],
+                    normalized_cross_correlation[correlation_max_idx[0][0]-1:correlation_max_idx[0][0]+2, correlation_max_idx[1][0]-1:correlation_max_idx[1][0]+2],
                     correlation_covariance,
                     subpixel_peak,
                     numeric_partial_derivative_increment)
