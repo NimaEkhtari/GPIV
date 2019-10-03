@@ -7,6 +7,7 @@ import matplotlib.patches
 import math
 import json
 import show_functions
+from scipy import interpolate
 
 
 def piv(before_height_file, after_height_file,
@@ -111,8 +112,12 @@ class PivIterator:
                                         hz_search_start, vt_search_start,
                                         template_size, search_size)     
 
-                # flat template produces a divide by zero in normalized cross correlation
-                if ((height_template.max() - height_template.min()) == 0): 
+                # guard against flat areas, which produce a divide by zero in the correlation
+                # guard agains NaN values, which breaks scipy's match_template function
+                if (np.max(height_template)-np.min(height_template) < 1e-10 or
+                        np.max(height_search)-np.min(height_search) < 1e-10 or
+                        np.isnan(height_template).any() or
+                        np.isnan(height_search).any()):
                     continue
 
                 normalized_cross_correlation = match_template(height_search, height_template) # uses FFT based correlation
@@ -160,7 +165,18 @@ class PivIterator:
 
         # bilinear interpolation of grid of vectors for each pixel
         # then use the interpolated vectors to deform 'after' images using cubic spline interpolation
-
+        piv_origins = np.asarray(piv_origins)
+        piv_vectors = np.asarray(piv_vectors)
+        image_u_coords = np.arange(self._after_height.shape[1])
+        image_v_coords = np.arange(self._after_height.shape[0])
+        bilinear_u = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0])
+        bilinear_v = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,1])
+        image_u_vector_component = bilinear_u(image_u_coords, image_v_coords)
+        image_v_vector_component = bilinear_v(image_u_coords, image_v_coords)
+        plt.figure(figsize=(10,10))
+        plt.quiver(image_u_coords,image_v_coords,image_u_vector_component,-image_v_vector_component,angles='xy',scale_units='xy')
+        plt.axis('equal')
+        plt.show()
 
     def _show_piv_location(self,
                            before_axis, after_axis,
