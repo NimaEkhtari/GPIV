@@ -8,6 +8,7 @@ import math
 import json
 import show_functions
 from scipy import interpolate
+from scipy import ndimage
 
 
 def piv(before_height_file, after_height_file,
@@ -28,7 +29,8 @@ def piv(before_height_file, after_height_file,
 
     if not propagate:
         print("Computing PIV.")
-        piv_iterator.iterate(propagate, template_size*4, step_size*4)
+        piv_iterator.iterate(propagate, template_size, step_size)
+        piv_iterator.iterate(propagate, template_size, step_size)
 
 
 
@@ -73,9 +75,10 @@ class PivIterator:
         self._after_height_deformed = after_height
         self._after_uncertainty = after_uncertainty
         self._after_uncertainty_deformed = after_uncertainty
-        self._deformation_field = None
-        self._deformation_field_total = None
-
+        self._deformation_field_u = np.zeros(after_height.shape)
+        self._deformation_field_u_total = np.zeros(after_height.shape)
+        self._deformation_field_v = np.zeros(after_height.shape)
+        self._deformation_field_v_total = np.zeros(after_height.shape)
 
     def iterate(self, propagate, template_size, step_size):
         piv_origins = []
@@ -105,7 +108,7 @@ class PivIterator:
                 hz_search_end = int(hz_count*step_size + search_size + (template_size % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
                 vt_search_start = int(vt_count*step_size)
                 vt_search_end = int(vt_count*step_size + search_size + (template_size % 2)) 
-                height_search = self._after_height[vt_search_start:vt_search_end, hz_search_start:hz_search_end].copy()            
+                height_search = self._after_height_deformed[vt_search_start:vt_search_end, hz_search_start:hz_search_end].copy()            
 
                 self._show_piv_location(before_axis, after_axis,
                                         hz_template_start, vt_template_start,
@@ -164,19 +167,47 @@ class PivIterator:
         plt.close(status_figure)
 
         # bilinear interpolation of grid of vectors for each pixel
-        # then use the interpolated vectors to deform 'after' images using cubic spline interpolation
         piv_origins = np.asarray(piv_origins)
         piv_vectors = np.asarray(piv_vectors)
+        u_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0], kind='linear')
+        v_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,1], kind='linear')
         image_u_coords = np.arange(self._after_height.shape[1])
         image_v_coords = np.arange(self._after_height.shape[0])
-        bilinear_u = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0])
-        bilinear_v = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,1])
-        image_u_vector_component = bilinear_u(image_u_coords, image_v_coords)
-        image_v_vector_component = bilinear_v(image_u_coords, image_v_coords)
-        plt.figure(figsize=(10,10))
-        plt.quiver(image_u_coords,image_v_coords,image_u_vector_component,-image_v_vector_component,angles='xy',scale_units='xy')
-        plt.axis('equal')
+        self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
+        self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
+        self._deformation_field_u_total += self._deformation_field_u
+        self._deformation_field_v_total += self._deformation_field_v
+
+        status_figure = plt.figure()
+        computed_axis = plt.subplot(1, 2, 1)
+        interpolated_axis = plt.subplot(1, 2, 2)
+        computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1],angles='xy',scale_units='xy')
+        computed_axis.axis('equal')
+        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
+        interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],-self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
+        interpolated_axis.axis('equal')
         plt.show()
+
+        # deform 'after' images using cubic spline interpolation on the interpolated vector grid       
+        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
+        u_height_coord = image_u_coords + self._deformation_field_u
+        v_height_coord = image_v_coords + self._deformation_field_v
+        self._after_height_deformed = ndimage.map_coordinates(
+            self._after_height_deformed,
+            [v_height_coord.ravel(), u_height_coord.ravel()],
+            order=3,
+            mode='nearest'
+        ).reshape(self._after_height_deformed.shape)
+        
+        status_figure = plt.figure()
+        original_axis = plt.subplot(1, 2, 1)
+        deformed_axis = plt.subplot(1, 2, 2)
+        original_axis.set_title('Original')
+        original_axis.imshow(self._after_height, cmap=plt.cm.gray)
+        deformed_axis.set_title('Deformed')
+        deformed_axis.imshow(self._after_height_deformed, cmap=plt.cm.gray)
+        plt.show()
+
 
     def _show_piv_location(self,
                            before_axis, after_axis,
@@ -197,7 +228,7 @@ class PivIterator:
         
         plt.sca(after_axis)
         plt.cla()
-        after_axis.set_title('After')            
+        after_axis.set_title('After')
         after_axis.imshow(self._after_height_deformed, cmap=plt.cm.gray)            
         after_axis.add_patch(matplotlib.patches.Rectangle(
             (hz_search_start,vt_search_start), 
@@ -217,7 +248,7 @@ class PivIterator:
         dyy = normalized_cross_correlation[2,1] + normalized_cross_correlation[0,1] - 2*normalized_cross_correlation[1,1]
         dxy = (normalized_cross_correlation[2,2] - normalized_cross_correlation[2,0] - normalized_cross_correlation[0,2] + normalized_cross_correlation[0,0]) / 4
         
-        # hz_delta is postive left-to-right; vt_delta is postive top-to-bottom
+        # hz_delta is positive left-to-right; vt_delta is positive top-to-bottom
         hz_delta = -(dyy*dx - dxy*dy) / (dxx*dyy - dxy*dxy)
         vt_delta = -(dxx*dy - dxy*dx) / (dxx*dyy - dxy*dxy)
 
