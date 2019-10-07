@@ -39,6 +39,10 @@ def piv(before_height, after_height, template_size, step_size, prop, outname):
     else:
         output_base_name = ''
 
+    # Silently force odd size template for clarity in computations
+    if template_size % 2 == 0:
+        template_size += 1
+
     piv_functions.piv(before_height, after_height, 
                       template_size, step_size, 
                       before_uncertainty, after_uncertainty,
