@@ -1,14 +1,15 @@
 import rasterio
 import numpy as np
 import sys
-from skimage.feature import match_template
+from skimage.feature import match_template, peak_local_max
+from scipy import interpolate, ndimage
 import matplotlib.pyplot as plt
 import matplotlib.patches
 import math
 import json
+import heapq
 import show_functions
-from scipy import interpolate
-from scipy import ndimage
+
 
 
 def piv(before_height_file, after_height_file,
@@ -24,16 +25,17 @@ def piv(before_height_file, after_height_file,
                                        after_uncertainty_file,
                                        propagate)
 
-
-
     if not propagate:
         print("Estimating horizontal displacements.")
+
         piv_object = PivObject(before_height, [],
                                after_height, [])
+
         piv_object.correlate(False, template_size, step_size)
         piv_object.deform(False)
         piv_object.correlate(False, template_size, step_size)
-        piv_object.export_vectors(template_size, step_size, geo_transform, output_base_name)
+        piv_object.deform(False)
+        piv_object.export_vectors(geo_transform, output_base_name)
         exit()
     else:
         print("Estimating bias uncertainty.")
@@ -146,22 +148,37 @@ class PivObject:
                         np.isnan(height_template).any() or
                         np.isnan(height_search).any()):
                     continue
+                
+                # fft based cross-correlation
+                normalized_cross_correlation = match_template(height_search, height_template)                
+                # ncc peak indices and values
+                max_indices = peak_local_max(normalized_cross_correlation, min_distance=1, exclude_border=1)
+                max_values = [normalized_cross_correlation[max_indices[i,0],max_indices[i,1]] for i in range(max_indices.shape[0])]
+                # if more than one peak, reject if ratio is <1.2
+                if len(max_values) > 1:                    
+                    highest_two_indices = heapq.nlargest(2, range(len(max_values)), max_values.__getitem__)
+                    peak_to_peak_ratio = max_values[highest_two_indices[0]] / max_values[highest_two_indices[1]]
+                    if peak_to_peak_ratio < 1.0001:
+                        print('PPR = {}'.format(peak_to_peak_ratio))
+                        # plt.imshow(normalized_cross_correlation)
+                        # plt.show()
+                        continue
+                    max_idx = np.argwhere(normalized_cross_correlation == max_values[highest_two_indices[0]])[0]                    
+                else:
+                    max_idx = np.argwhere(normalized_cross_correlation == max_values[0])[0]
 
-                normalized_cross_correlation = match_template(height_search, height_template) # uses FFT based correlation
-                max_idx = np.where(normalized_cross_correlation == np.amax(normalized_cross_correlation))
+                # # peak location on edges of correlation matrix breaks sub-pixel peak interpolation
+                # if (max_idx[0]==0 or
+                #         max_idx[1]==0 or 
+                #         max_idx[0]==normalized_cross_correlation.shape[0]-1 or 
+                #         max_idx[1]==normalized_cross_correlation.shape[1]-1): 
+                #     continue
 
-                # peak location on edges of correlation matrix breaks sub-pixel peak interpolation
-                if (max_idx[0][0]==0 or
-                        max_idx[1][0]==0 or 
-                        max_idx[0][0]==normalized_cross_correlation.shape[0]-1 or 
-                        max_idx[1][0]==normalized_cross_correlation.shape[1]-1): 
-                    continue
-
-                subpixel_peak = self._get_subpixel_peak(normalized_cross_correlation[max_idx[0][0]-1:max_idx[0][0]+2, max_idx[1][0]-1:max_idx[1][0]+2])
+                subpixel_peak = self._get_subpixel_peak(normalized_cross_correlation[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2])
                 
                 self._piv_origins.append((hz_count*step_size + template_size, vt_count*step_size + template_size))
-                self._piv_vectors.append((max_idx[1][0] - (template_size+1)/2 + subpixel_peak[0],
-                                          max_idx[0][0] - (template_size+1)/2 + subpixel_peak[1]))
+                self._piv_vectors.append((max_idx[1] - (template_size+1)/2 + subpixel_peak[0],
+                                          max_idx[0] - (template_size+1)/2 + subpixel_peak[1]))
 
                 if propagate:
                     uncertainty_template = self._before_uncertainty[vt_template_start:vt_template_end, hz_template_start:hz_template_end].copy()
@@ -171,14 +188,14 @@ class PivObject:
                     correlation_covariance = self._propagate_pixel_into_correlation(
                         height_template,
                         uncertainty_template, 
-                        height_search[max_idx[0][0]-1:max_idx[0][0]+template_size+1, max_idx[1][0]-1:max_idx[1][0]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search array,
-                        uncertainty_search[max_idx[0][0]-1:max_idx[0][0]+template_size+1, max_idx[1][0]-1:max_idx[1][0]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search error array
-                        normalized_cross_correlation[max_idx[0][0]-1:max_idx[0][0]+2, max_idx[1][0]-1:max_idx[1][0]+2], # 3x3 array of correlation values centered on the correlation peak
+                        height_search[max_idx[0]-1:max_idx[0]+template_size+1, max_idx[1]-1:max_idx[1]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search array,
+                        uncertainty_search[max_idx[0]-1:max_idx[0]+template_size+1, max_idx[1]-1:max_idx[1]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search error array
+                        normalized_cross_correlation[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2], # 3x3 array of correlation values centered on the correlation peak
                         self._partial_derivative_increment) 
 
                     # propagate the correlation covariance into the subpixel peak location
                     subpixel_peak_covariance = self._propagate_correlation_into_subpixel_peak(
-                        normalized_cross_correlation[max_idx[0][0]-1:max_idx[0][0]+2, max_idx[1][0]-1:max_idx[1][0]+2],
+                        normalized_cross_correlation[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2],
                         correlation_covariance,
                         subpixel_peak,
                         self._partial_derivative_increment)
@@ -250,12 +267,20 @@ class PivObject:
     
 
     def export_vectors(self, geo_transform, output_base_name):
+        # get the total vector at each origin
+        piv_vectors = []
+        for origin in self._piv_origins:
+            piv_vectors.append((
+                self._deformation_field_u_total[origin[1], origin[0]],
+                self._deformation_field_v_total[origin[1], origin[0]]
+            ))
+
         # Convert from pixels to ground distance
-        piv_origins = np.asarray(self._piv_origins)        
+        piv_origins = np.asarray(self._piv_origins, dtype=np.float64)
         piv_origins *= geo_transform[0,0]  # Scale by pixel ground size
         piv_origins[:,0] += geo_transform[0,2]  # Offset by leftmost pixel to get ground coordinate
         piv_origins[:,1] = geo_transform[1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate    
-        piv_vectors = np.asarray(self._piv_vectors)
+        piv_vectors = np.asarray(piv_vectors)
         piv_vectors *= geo_transform[0,0]  # Scale by pixel ground size
         
         origins_vectors = np.concatenate((piv_origins, piv_vectors), axis=1)
