@@ -33,9 +33,9 @@ def piv(before_height_file, after_height_file,
                                after_height, [])
 
         piv_object.correlate(False, template_size, step_size)
-        piv_object.deform(False)
+        piv_object.deform(False, template_size, step_size)
         piv_object.correlate(False, template_size, step_size)
-        piv_object.deform(False)
+        piv_object.deform(False, template_size, step_size)
         piv_object.export_vectors(geo_transform, output_base_name)
         exit()
     else:
@@ -206,10 +206,39 @@ class PivObject:
         plt.close(status_figure)
 
 
-    def deform(self, propagate, step_size):
+    def deform(self, propagate, template_size, step_size):
         # outlier detection
-        
+        # start by creating numpy array of size of piv grid
 
+        search_size = template_size * 2
+        number_horizontal_computations = math.floor((self._before_height.shape[1] - search_size) / step_size)
+        number_vertical_computations = math.floor((self._before_height.shape[0] - search_size) / step_size)
+        u_img = np.empty((number_vertical_computations,number_horizontal_computations))
+        u_img[:] = np.nan
+        v_img = u_img.copy()
+        for i in range(len(self._piv_origins)):
+            row = int((self._piv_origins[i][1] - template_size)/step_size)
+            col = int((self._piv_origins[i][0] - template_size)/step_size)
+            # print("row={}, col={}".format(row, col))
+            u_img[row,col] = self._piv_vectors[i][0]
+            v_img[row,col] = -self._piv_vectors[i][1]
+        u_img = np.asarray(u_img)
+        v_img = np.asarray(v_img)
+        print(u_img)
+
+        status_figure = plt.figure()
+        u_axis = plt.subplot(1, 3, 1)
+        v_axis = plt.subplot(1, 3, 2)
+        computed_axis = plt.subplot(1, 3, 3)
+        u_axis.imshow(u_img)
+        v_axis.imshow(v_img)
+        piv_origins = np.asarray(self._piv_origins)
+        piv_vectors = np.asarray(self._piv_vectors)
+        computed_axis.quiver(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1],angles='xy',scale_units='xy')
+        computed_axis.axis('equal') 
+        plt.show()
+
+        quit()
 
         # bilinear interpolation of grid of vectors for each pixel
         print('here1')
@@ -235,7 +264,7 @@ class PivObject:
         interpolated_axis.axis('equal')
         plt.show()
 
-        # deform 'after' images using cubic spline interpolation on the interpolated vector grid       
+        # deform 'after' images using cubic spline interpolation on the interpolated vector grid
         image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
         u_height_coord = image_u_coords + self._deformation_field_u
         v_height_coord = image_v_coords + self._deformation_field_v
@@ -264,20 +293,20 @@ class PivObject:
         plt.show()
 
 
-    def detect_outlier(self, step_size):
-        # normalized residual - start with non-edge locations
-        origin_xy = self._piv_origins
-        vector_uv = self._piv_vectors
+    # def detect_outlier(self, step_size):
+    #     # normalized residual - start with non-edge locations
+    #     origin_xy = self._piv_origins
+    #     vector_uv = self._piv_vectors
 
-        for xy in origin_xy:
-            # all distances relative to current xy
-            distances = cdist(xy, origin_xy)
-            # find up to 8 adjacent neighbors (those within stepsize*sqrt(2))
-            neighbors_idx = np.asarray(distances>step_size/2 and distances<step_size*1.5).nonzero()[1]
-            # require at least 3 neighbors
-            if neighbors_idx.size > 2:
+    #     for xy in origin_xy:
+    #         # all distances relative to current xy
+    #         distances = cdist(xy, origin_xy)
+    #         # find up to 8 adjacent neighbors (those within stepsize*sqrt(2))
+    #         neighbors_idx = np.asarray(distances>step_size/2 and distances<step_size*1.5).nonzero()[1]
+    #         # require at least 3 neighbors
+    #         if neighbors_idx.size > 2:
                 
-            else:
+    #         else:
 
 
 

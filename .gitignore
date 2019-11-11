@@ -6,3 +6,4 @@
 /*.egg-info
 *.json
 !/example_data/*.tif
+*.ipynb
