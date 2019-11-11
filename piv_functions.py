@@ -3,6 +3,7 @@ import numpy as np
 import sys
 from skimage.feature import match_template, peak_local_max
 from scipy import interpolate, ndimage
+from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import matplotlib.patches
 import math
@@ -205,7 +206,11 @@ class PivObject:
         plt.close(status_figure)
 
 
-    def deform(self, propagate):
+    def deform(self, propagate, step_size):
+        # outlier detection
+        
+
+
         # bilinear interpolation of grid of vectors for each pixel
         print('here1')
         piv_origins = np.asarray(self._piv_origins)
@@ -257,6 +262,23 @@ class PivObject:
         deformed_axis.set_title('Deformed')
         deformed_axis.imshow(self._after_height_deformed, cmap=plt.cm.gray)
         plt.show()
+
+
+    def detect_outlier(self, step_size):
+        # normalized residual - start with non-edge locations
+        origin_xy = self._piv_origins
+        vector_uv = self._piv_vectors
+
+        for xy in origin_xy:
+            # all distances relative to current xy
+            distances = cdist(xy, origin_xy)
+            # find up to 8 adjacent neighbors (those within stepsize*sqrt(2))
+            neighbors_idx = np.asarray(distances>step_size/2 and distances<step_size*1.5).nonzero()[1]
+            # require at least 3 neighbors
+            if neighbors_idx.size > 2:
+                
+            else:
+
 
 
     def compute_bias(self):
