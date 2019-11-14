@@ -1,6 +1,6 @@
 import click
-import piv_functions
-import show_functions
+from piv_functions import format_input, ingest_data, run_piv
+from show_functions import show
 
 
 @click.group()
@@ -9,8 +9,8 @@ def cli():
 
 
 @click.command()
-@click.argument('before_height', type=click.Path(exists=True, readable=True))
-@click.argument('after_height', type=click.Path(exists=True, readable=True))
+@click.argument('before', type=click.Path(exists=True, readable=True))
+@click.argument('after', type=click.Path(exists=True, readable=True))
 @click.argument('template_size', type=click.IntRange(3, None))
 @click.argument('step_size', type=click.IntRange(1, None))
 @click.option('--prop', nargs=2, type=click.Path(exists=True, readable=True), help='Option to propagate error. Requires two arguments: 1) pre-event uncertainties in GeoTIFF format, 2) post-event uncertainties in GeoTIFF format.')
@@ -20,39 +20,28 @@ def piv(before_height, after_height, template_size, step_size, prop, outname):
     Runs PIV on a pair pre- and post-event DEMs.
 
     \b
-    Arguments: BEFORE_HEIGHT  Pre-event DEM in GeoTIFF format
-               AFTER_HEIGHT   Post-event DEM in GeoTIFF format
+    Arguments: BEFORE  Pre-event data (e.g., a DEM) in GeoTIFF format
+               AFTER   Post-event data (e.g., a DEM) in GeoTIFF format
                TEMPLATE_SIZE  Size of square correlation template in pixels
                STEP_SIZE      Size of template step in pixels
     '''
     # Format user input
+    user_input = format_input(
+        before,
+        after,
+        template_size,
+        step_size,
+        before_uncertainty,
+        after_uncertainty,
+        prop,
+        output_base_name
+    )
 
-    # Ingest user supplied data
+    # Ingest user supplied before and after GeoTIFF image data
+    image_data = ingest_data(user_input)
 
     # Launch image correlation process
-    
-    if prop:
-        propagate = True
-        before_uncertainty = prop[0]
-        after_uncertainty = prop[1]
-    else:
-        propagate = False
-        before_uncertainty = ''
-        after_uncertainty = ''
-    
-    if outname:
-        output_base_name = outname + '_'
-    else:
-        output_base_name = ''
-
-    # Silently force odd size template for clarity in computations
-    if template_size % 2 == 0:
-        template_size += 1
-
-    piv_functions.piv(before_height, after_height, 
-                      template_size, step_size, 
-                      before_uncertainty, after_uncertainty,
-                      propagate, output_base_name)
+    run_piv(user_input, image_data)
 
 
 @click.command()
@@ -67,7 +56,7 @@ def pivshow(background_image, vec, ell, vecscale, ellscale):
     
     Arguments: BACKGROUND_IMAGE  Background image in GeoTIFF format
     '''
-    show_functions.show(background_image, vec, ell, vecscale, ellscale)
+    show(background_image, vec, ell, vecscale, ellscale)
 
 
 cli.add_command(piv)
