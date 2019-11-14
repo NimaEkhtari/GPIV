@@ -25,6 +25,12 @@ def piv(before_height, after_height, template_size, step_size, prop, outname):
                TEMPLATE_SIZE  Size of square correlation template in pixels
                STEP_SIZE      Size of template step in pixels
     '''
+    # Format user input
+
+    # Ingest user supplied data
+
+    # Launch image correlation process
+    
     if prop:
         propagate = True
         before_uncertainty = prop[0]

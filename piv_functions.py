@@ -1,15 +1,17 @@
+
+import sys
+import math
+import json
+import heapq
 import rasterio
 import numpy as np
-import sys
 from skimage.feature import match_template, peak_local_max
 from scipy import interpolate, ndimage
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import matplotlib.patches
-import math
-import json
-import heapq
 import show_functions
+from robust_smooth_2d import robust_smooth_2d
 
 
 
@@ -224,7 +226,6 @@ class PivObject:
             v_img[row,col] = -self._piv_vectors[i][1]
         u_img = np.asarray(u_img)
         v_img = np.asarray(v_img)
-        print(u_img)
 
         status_figure = plt.figure()
         u_axis = plt.subplot(1, 3, 1)
@@ -234,35 +235,90 @@ class PivObject:
         v_axis.imshow(v_img)
         piv_origins = np.asarray(self._piv_origins)
         piv_vectors = np.asarray(self._piv_vectors)
-        computed_axis.quiver(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1],angles='xy',scale_units='xy')
+        computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1],angles='xy',scale_units='xy')
         computed_axis.axis('equal') 
+        plt.show()
+
+        # apply smooth
+        u_smth, s = robust_smooth_2d(u_img, robust=True)
+        v_smth, s = robust_smooth_2d(v_img, robust=True)
+
+        status_figure = plt.figure()
+        u_axis = plt.subplot(1, 4, 1)
+        v_axis = plt.subplot(1, 4, 2)
+        u_axis.imshow(u_img)
+        v_axis.imshow(v_img)
+        us_axis = plt.subplot(1, 4, 3)
+        vs_axis = plt.subplot(1, 4, 4)
+        us_axis.imshow(u_smth)
+        vs_axis.imshow(v_smth)
+        plt.show()
+
+        # quit()
+        temp_piv_origins = []
+        temp_piv_u = []
+        temp_piv_v = []
+        for vt_count in range(number_vertical_computations):
+            for hz_count in range(number_horizontal_computations):
+                temp_piv_origins.append((hz_count*step_size + template_size, vt_count*step_size + template_size))
+                row = vt_count
+                col = hz_count
+                temp_piv_u.append(u_smth[row, col])
+                temp_piv_v.append(v_smth[row, col])
+
+        # # cubic interpolation of grid of vectors for each pixel
+        # print('here1')
+        # piv_origins = np.asarray(temp_piv_origins)
+        # temp_piv_u = np.asarray(temp_piv_u)
+        # temp_piv_v = np.asarray(temp_piv_v)
+        # u_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_u[:], kind='cubic')
+        # v_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_v[:], kind='cubic')
+        # image_u_coords = np.arange(self._after_height.shape[1])
+        # image_v_coords = np.arange(self._after_height.shape[0])
+        # self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
+        # self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
+        # self._deformation_field_u_total += self._deformation_field_u
+        # self._deformation_field_v_total += self._deformation_field_v
+        # print('here2')
+
+        # status_figure = plt.figure()
+        # computed_axis = plt.subplot(1, 2, 1)
+        # interpolated_axis = plt.subplot(1, 2, 2)
+        # computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], temp_piv_u[:], temp_piv_v[:],angles='xy',scale_units='xy')
+        # computed_axis.axis('equal')
+        # image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
+        # interpolated_axis.quiver(image_u_coords[::2,::2],-image_v_coords[::2,::2],self._deformation_field_u[::2,::2],self._deformation_field_v[::2,::2],angles='xy',scale_units='xy')
+        # interpolated_axis.axis('equal')
+        # plt.show()
+
+        # robust smooth interpolation of grid of vectors for each pixel
+        image_u_coords = np.empty(self._after_height.shape)
+        image_u_coords[:] = np.nan
+        image_v_coords = image_u_coords.copy()
+        print(temp_piv_origins)
+        for i in range(len(temp_piv_origins)):
+            image_u_coords[temp_piv_origins[i]] = temp_piv_u[i]
+            image_v_coords[temp_piv_origins[i]] = temp_piv_v[i]
+
+        plt.imshow(image_v_coords)
+        plt.show()
+
+        u_smth, s = robust_smooth_2d(image_u_coords, robust=True)
+        v_smth, s = robust_smooth_2d(image_v_coords, robust=True)
+
+        status_figure = plt.figure()
+        u_axis = plt.subplot(1, 4, 1)
+        v_axis = plt.subplot(1, 4, 2)
+        u_axis.imshow(image_u_coords)
+        v_axis.imshow(image_v_coords)
+        us_axis = plt.subplot(1, 4, 3)
+        vs_axis = plt.subplot(1, 4, 4)
+        us_axis.imshow(u_smth)
+        vs_axis.imshow(v_smth)
         plt.show()
 
         quit()
 
-        # bilinear interpolation of grid of vectors for each pixel
-        print('here1')
-        piv_origins = np.asarray(self._piv_origins)
-        piv_vectors = np.asarray(self._piv_vectors)
-        u_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0], kind='linear')
-        v_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,1], kind='linear')
-        image_u_coords = np.arange(self._after_height.shape[1])
-        image_v_coords = np.arange(self._after_height.shape[0])
-        self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
-        self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
-        self._deformation_field_u_total += self._deformation_field_u
-        self._deformation_field_v_total += self._deformation_field_v
-        print('here2')
-
-        status_figure = plt.figure()
-        computed_axis = plt.subplot(1, 2, 1)
-        interpolated_axis = plt.subplot(1, 2, 2)
-        computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1],angles='xy',scale_units='xy')
-        computed_axis.axis('equal')
-        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
-        interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],-self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
-        interpolated_axis.axis('equal')
-        plt.show()
 
         # deform 'after' images using cubic spline interpolation on the interpolated vector grid
         image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
