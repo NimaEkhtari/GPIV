@@ -19,10 +19,8 @@ def format_input(before,
                  after,
                  template_size,
                  step_size,
-                 before_uncertainty,
-                 after_uncertainty,
                  prop,
-                 output_base_name):
+                 outname):
 
     user_input = dict(before_file=before,
                       after_file=after,
@@ -104,7 +102,8 @@ def run_piv(user_input, image_data):
                       user_input["step_size"],
                       False)
         piv.deform(user_input["template_size"],
-                   user_input["step_size"])
+                   user_input["step_size"],
+                   user_input["propagate"])                   
     # For the third (final) iteration, propagate uncertainty if requested and
     # compute the final, cumulative vector displacements
     piv.correlate(user_input["template_size"],
@@ -141,13 +140,13 @@ class Piv:
         self._before = image_data["before"]
         self._before_uncertainty = image_data["before_uncertainty"]
         self._after = image_data["after"]
-        self._after_deformed = image_data["after_height"]
         self._after_uncertainty = image_data["after_uncertainty"]
+        self._after_deformed = image_data["after"]        
         self._after_uncertainty_deformed = image_data["after_uncertainty"]
-        self._deformation_field_u = np.zeros(after_height.shape)
-        self._deformation_field_u_total = np.zeros(after_height.shape)
-        self._deformation_field_v = np.zeros(after_height.shape)
-        self._deformation_field_v_total = np.zeros(after_height.shape)
+        self._deformation_field_u = np.zeros(image_data["after"].shape)
+        self._deformation_field_u_total = np.zeros(image_data["after"].shape)
+        self._deformation_field_v = np.zeros(image_data["after"].shape)
+        self._deformation_field_v_total = np.zeros(image_data["after"].shape)
         self._partial_derivative_increment = 0.000001
         self._piv_vectors = []
         self._piv_origins = []
@@ -165,120 +164,90 @@ class Piv:
         before_axis = plt.subplot(1, 2, 1)
         after_axis = plt.subplot(1, 2, 2)
 
-        # Precompute the window correlation data
-        window_data = self._get_windows(template_size, step_size)
+        # Pre-extract all the required window data
+        window_data = self._get_windows(template_size, step_size, propagate)
 
         for record in window_data:
             # Display current analysis area
-            self._show_piv_location(
-                before_axis,
-                after_axis,
-                record[1][0],
-                record[1][1],
-                record[2][0],
-                record[2][1],
-                template_size,
-                search_size
-            )
+            self._show_piv_location(before_axis, after_axis,
+                                    record[1][0], record[1][1],
+                                    record[2][0], record[2][1],
+                                    template_size, template_size*2)
 
             # Compute normalized cross-correlation (NCC)
-            norm_cross_corr = match_template(record[4], record[3])
-            max_idx = np.where(norm_cross_corr == np.max(norm_cross_corr))
+            ncc = match_template(record[4], record[3])
+            max_idx = np.where(ncc == np.max(ncc))
 
-            # peak location on edges of correlation matrix breaks sub-pixel peak interpolation
-            if (max_idx[0]==0 or
-                    max_idx[1]==0 or 
-                    max_idx[0]==norm_cross_corr.shape[0]-1 or 
-                    max_idx[1]==norm_cross_corr.shape[1]-1): 
-                continue
+            # Interpolate and store sub-pixel NCC peak
+            subpixel_peak = self._subpixel_peak(ncc,
+                                                max_idx,
+                                                record[0],
+                                                template_size)
 
-            subpixel_peak = self._get_subpixel_peak(norm_cross_corr[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2])
-            
-            self._piv_origins.append((hz_count*step_size + template_size, vt_count*step_size + template_size))
-            self._piv_vectors.append((max_idx[1] - (template_size+1)/2 + subpixel_peak[0],
-                                        max_idx[0] - (template_size+1)/2 + subpixel_peak[1]))
-
+            # Propagate uncertainty if requrested and store
             if propagate:
-                uncertainty_template = self._before_uncertainty[vt_template_start:vt_template_end, hz_template_start:hz_template_end].copy()
-                uncertainty_search = self._after_uncertainty[vt_search_start:vt_search_end, hz_search_start:hz_search_end].copy()    
+                self._propagate_uncertainty(record, ncc, max_idx, subpixel_peak)
 
-                # propagate raster error into the 3x3 patch of correlation values that are centered on the correlation peak
-                correlation_covariance = self._propagate_pixel_into_correlation(
-                    height_template,
-                    uncertainty_template, 
-                    height_search[max_idx[0]-1:max_idx[0]+template_size+1, max_idx[1]-1:max_idx[1]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search array,
-                    uncertainty_search[max_idx[0]-1:max_idx[0]+template_size+1, max_idx[1]-1:max_idx[1]+template_size+1], # templateSize+2 x templateSize+2 subarray of the search error array
-                    norm_cross_corr[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2], # 3x3 array of correlation values centered on the correlation peak
-                    self._partial_derivative_increment) 
-
-                # propagate the correlation covariance into the subpixel peak location
-                subpixel_peak_covariance = self._propagate_correlation_into_subpixel_peak(
-                    norm_cross_corr[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2],
-                    correlation_covariance,
-                    subpixel_peak,
-                    self._partial_derivative_increment)
-                
-                self._peak_covariance.append(subpixel_peak_covariance.tolist())   
-
+        # All done. Close progress display figure
         plt.close(status_figure)
 
-    def deform(self, propagate, template_size, step_size):
-        # outlier detection
-        # start by creating numpy array of size of piv grid
 
-        search_size = template_size * 2
-        number_horizontal_computations = math.floor((self._before_height.shape[1] - search_size) / step_size)
-        number_vertical_computations = math.floor((self._before_height.shape[0] - search_size) / step_size)
-        u_img = np.empty((number_vertical_computations,number_horizontal_computations))
+    def deform(self, template_size, step_size, propagate):
+
+        # Create a NaN image for each vector component (u and v)
+        search_size = template_size*2
+        num_hz_comps = math.floor((self._before.shape[1] - search_size)
+                                   / step_size)
+        num_vt_comps = math.floor((self._before.shape[0] - search_size)
+                                   / step_size)
+        u_img = np.empty((num_vt_comps, num_hz_comps))
         u_img[:] = np.nan
         v_img = u_img.copy()
+        # Overwrite the NaN values where valid PIV vectors exist
         for i in range(len(self._piv_origins)):
             row = int((self._piv_origins[i][1] - template_size)/step_size)
             col = int((self._piv_origins[i][0] - template_size)/step_size)
-            # print("row={}, col={}".format(row, col))
             u_img[row,col] = self._piv_vectors[i][0]
             v_img[row,col] = -self._piv_vectors[i][1]
-        u_img = np.asarray(u_img)
-        v_img = np.asarray(v_img)
+        # Smooth the u and v vector component images
+        u_smooth, s = robust_smooth_2d(u_img, robust=True)
+        v_smooth, s = robust_smooth_2d(v_img, robust=True)
 
+        # Status figure of before and after smoothing
         status_figure = plt.figure()
-        u_axis = plt.subplot(1, 3, 1)
-        v_axis = plt.subplot(1, 3, 2)
-        computed_axis = plt.subplot(1, 3, 3)
+        u_axis = plt.subplot(2, 3, 1)
+        v_axis = plt.subplot(2, 3, 2)
         u_axis.imshow(u_img)
         v_axis.imshow(v_img)
+        before_axis = plt.subplot(2, 3, 3)
         piv_origins = np.asarray(self._piv_origins)
         piv_vectors = np.asarray(self._piv_vectors)
-        computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1],angles='xy',scale_units='xy')
-        computed_axis.axis('equal') 
-        plt.show()
-
-        # apply smooth
-        u_smth, s = robust_smooth_2d(u_img, robust=True)
-        v_smth, s = robust_smooth_2d(v_img, robust=True)
-
-        status_figure = plt.figure()
-        u_axis = plt.subplot(1, 4, 1)
-        v_axis = plt.subplot(1, 4, 2)
-        u_axis.imshow(u_img)
-        v_axis.imshow(v_img)
-        us_axis = plt.subplot(1, 4, 3)
-        vs_axis = plt.subplot(1, 4, 4)
-        us_axis.imshow(u_smth)
-        vs_axis.imshow(v_smth)
-        plt.show()
-
-        # quit()
+        before_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1], angles='xy', scale_units='xy')
+        before_axis.axis('equal') 
+        u_axis_smooth = plt.subplot(2, 3, 4)
+        v_axis_smooth = plt.subplot(2, 3, 5)
+        u_axis_smooth.imshow(u_smooth)
+        v_axis_smooth.imshow(v_smooth)
+        after_axis = plt.subplot(2, 3, 6)
         temp_piv_origins = []
         temp_piv_u = []
         temp_piv_v = []
-        for vt_count in range(number_vertical_computations):
-            for hz_count in range(number_horizontal_computations):
-                temp_piv_origins.append((hz_count*step_size + template_size, vt_count*step_size + template_size))
+        for vt_count in range(num_vt_comps):
+            for hz_count in range(num_hz_comps):
+                temp_piv_origins.append((hz_count*step_size + template_size,
+                                         vt_count*step_size + template_size))
                 row = vt_count
                 col = hz_count
-                temp_piv_u.append(u_smth[row, col])
-                temp_piv_v.append(v_smth[row, col])
+                temp_piv_u.append(u_smooth[row, col])
+                temp_piv_v.append(v_smooth[row, col])
+        temp_piv_origins = np.asarray(temp_piv_origins)
+        temp_piv_u = np.asarray(temp_piv_u)
+        temp_piv_v = np.asarray(temp_piv_v)
+        after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_v, -temp_piv_u, angles='xy', scale_units='xy')
+        plt.show()
+
+        quit()
+        
 
         # # cubic interpolation of grid of vectors for each pixel
         # print('here1')
@@ -317,8 +286,8 @@ class Piv:
         plt.imshow(image_v_coords)
         plt.show()
 
-        u_smth, s = robust_smooth_2d(image_u_coords, robust=True)
-        v_smth, s = robust_smooth_2d(image_v_coords, robust=True)
+        u_smooth, s = robust_smooth_2d(image_u_coords, robust=True)
+        v_smooth, s = robust_smooth_2d(image_v_coords, robust=True)
 
         status_figure = plt.figure()
         u_axis = plt.subplot(1, 4, 1)
@@ -327,8 +296,8 @@ class Piv:
         v_axis.imshow(image_v_coords)
         us_axis = plt.subplot(1, 4, 3)
         vs_axis = plt.subplot(1, 4, 4)
-        us_axis.imshow(u_smth)
-        vs_axis.imshow(v_smth)
+        us_axis.imshow(u_smooth)
+        vs_axis.imshow(v_smooth)
         plt.show()
 
         quit()
@@ -424,11 +393,11 @@ class Piv:
         print("PIV covariance matrices saved to file '{}covariances.json'".format(output_base_name))
 
 
-    def _get_windows(self, template_size, step_size):
+    def _get_windows(self, template_size, step_size, propagate):
         search_size = template_size*2
-        num_hz_comps = math.floor((self._before_height.shape[1] - search_size)
+        num_hz_comps = math.floor((self._before.shape[1] - search_size)
                                    / step_size)
-        num_vt_comps = math.floor((self._before_height.shape[0] - search_size)
+        num_vt_comps = math.floor((self._before.shape[0] - search_size)
                                    / step_size)
 
         window_data = []
@@ -436,10 +405,11 @@ class Piv:
             for hz in range(num_hz_comps):
                 # Correlation origin
                 origin = [hz*step_size + template_size, 
-                    vt*step_size + template_size]
+                          vt*step_size + template_size]
+
                 # Template hz and vt start indices
-                hz_template_start = int(hz*step_size + (template_size+1)/2)                
-                vt_template_start = int(vt*step_size + (template_size+1)/2)                
+                hz_template_start = int(hz*step_size + (template_size+1)/2)
+                vt_template_start = int(vt*step_size + (template_size+1)/2)
                 # Template hz and vt end indices
                 hz_template_end = int(hz_template_start + template_size - 1)
                 vt_template_end = int(vt_template_start + template_size - 1)
@@ -449,11 +419,24 @@ class Piv:
                 # Search hz and vt end indices
                 hz_search_end = int(hz_search_start + search_size)
                 vt_search_end = int(vt_search_start + search_size)
+
                 # Template and search image patches
                 template = self._before[vt_template_start:vt_template_end,
                     hz_template_start:hz_template_end].copy()
                 search = self._after_deformed[vt_search_start:vt_search_end,
                     hz_search_start:hz_search_end].copy()
+                # Template and search uncertainty image patches
+                if propagate:
+                    template_uncertainty = self._before_uncertainty[
+                        vt_template_start:vt_template_end,
+                        hz_template_start:hz_template_end].copy()
+                    search_uncertainty = self._after_uncertainty_deformed[
+                        vt_search_start:vt_search_end,
+                        hz_search_start:hz_search_end].copy()
+                else:
+                    template_uncertainty = []
+                    search_uncertainty = []
+
                 # Guard against flat patches; they cause a divide by zero error
                 if (np.max(template)-np.min(template) < 1e-10 or
                         np.max(search)-np.min(search) < 1e-10):
@@ -461,15 +444,17 @@ class Piv:
                 # Guard against NaN values; they break SciPy's match_template()
                 if (np.isnan(template).any() or np.isnan(search).any()):
                     continue
+
                 # Append
                 window_data.append([
                     origin,
                     [hz_template_start, vt_template_start],
                     [hz_search_start, vt_search_start],
                     template,
-                    search
-                ])
-        
+                    search,
+                    template_uncertainty,
+                    search_uncertainty])
+
         return window_data
 
 
@@ -481,7 +466,7 @@ class Piv:
         plt.sca(before_axis)
         plt.cla()
         before_axis.set_title('Before')
-        before_axis.imshow(self._before_height, cmap=plt.cm.gray)
+        before_axis.imshow(self._before, cmap=plt.cm.gray)
         before_axis.add_patch(matplotlib.patches.Rectangle(
             (hz_template_start, vt_template_start), 
             template_size-1, 
@@ -493,7 +478,7 @@ class Piv:
         plt.sca(after_axis)
         plt.cla()
         after_axis.set_title('After')
-        after_axis.imshow(self._after_height_deformed, cmap=plt.cm.gray)            
+        after_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
         after_axis.add_patch(matplotlib.patches.Rectangle(
             (hz_search_start,vt_search_start), 
             search_size-1, 
@@ -504,18 +489,71 @@ class Piv:
 
         plt.pause(0.1)
 
-    def _get_subpixel_peak(self, normalized_cross_correlation):
-        dx = (normalized_cross_correlation[1,2] - normalized_cross_correlation[1,0]) / 2
-        dxx = normalized_cross_correlation[1,2] + normalized_cross_correlation[1,0] - 2*normalized_cross_correlation[1,1]
-        dy = (normalized_cross_correlation[2,1] - normalized_cross_correlation[0,1]) / 2
-        dyy = normalized_cross_correlation[2,1] + normalized_cross_correlation[0,1] - 2*normalized_cross_correlation[1,1]
-        dxy = (normalized_cross_correlation[2,2] - normalized_cross_correlation[2,0] - normalized_cross_correlation[0,2] + normalized_cross_correlation[0,0]) / 4
+
+    def _subpixel_peak(self, ncc, max_idx, origin, template_size):
+        # Check for peak location on edges of NCC matrix - this breaks
+        # the sub-pixel peak interpolation
+        if (max_idx[0]==0 or 
+                max_idx[1]==0 or
+                max_idx[0]==ncc.shape[0]-1 or
+                max_idx[1]==ncc.shape[1]-1): 
+            return False
+
+        # Extract 3x3 submatrix centered on NCC maximum pixel
+        local = ncc[max_idx[0][0]-1:max_idx[0][0]+2, 
+                    max_idx[1][0]-1:max_idx[1][0]+2]
+
+        dx = (local[1,2] - local[1,0]) / 2
+        dxx = local[1,2] + local[1,0] - 2*local[1,1]
+        dy = (local[2,1] - local[0,1]) / 2
+        dyy = local[2,1] + local[0,1] - 2*local[1,1]
+        dxy = (local[2,2] - local[2,0] - local[0,2] + local[0,0]) / 4
         
         # hz_delta is positive left-to-right; vt_delta is positive top-to-bottom
         hz_delta = -(dyy*dx - dxy*dy) / (dxx*dyy - dxy*dxy)
         vt_delta = -(dxx*dy - dxy*dx) / (dxx*dyy - dxy*dxy)
 
+        # All done. Store and return subpixel peak
+        self._piv_origins.append(origin)
+        self._piv_vectors.append(
+            (max_idx[1] - (template_size+1)/2 + hz_delta,
+             max_idx[0] - (template_size+1)/2 + vt_delta)
+        )
         return [hz_delta, vt_delta]
+
+
+    def _propagate_uncertainty(self, record, ncc, max_idx, subpixel_peak):
+        # Check for valid subpixel peak location
+        if not subpixel_peak:
+            return
+
+        # Propagate raster error into the 3x3 patch of correlation values that 
+        # are centered on the correlation peak
+        correlation_covariance = self._propagate_pixel_into_correlation(
+            record[3],
+            record[5], 
+            # templateSize+2 x templateSize+2 subarray of the search array
+            record[4][max_idx[0]-1:max_idx[0]+template_size+1,
+                      max_idx[1]-1:max_idx[1]+template_size+1],
+            # templateSize+2 x templateSize+2 subarray of the search uncertainty
+            record[6][max_idx[0]-1:max_idx[0]+template_size+1,
+                      max_idx[1]-1:max_idx[1]+template_size+1],
+            # 3x3 array of correlation values centered on the correlation peak
+            ncc[max_idx[0]-1:max_idx[0]+2,
+                max_idx[1]-1:max_idx[1]+2], 
+            self._partial_derivative_increment) 
+
+        # Propagate the correlation covariance into the subpixel peak location
+        peak_covariance = self._propagate_correlation_into_subpixel_peak(
+            ncc[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2],
+            correlation_covariance,
+            subpixel_peak,
+            self._partial_derivative_increment
+        )
+
+        # All done. Store.
+        self._peak_covariance.append(peak_covariance.tolist())
+
 
     def _propagate_pixel_into_correlation(self,
                                           height_template,

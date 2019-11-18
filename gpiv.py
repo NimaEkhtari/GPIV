@@ -15,7 +15,7 @@ def cli():
 @click.argument('step_size', type=click.IntRange(1, None))
 @click.option('--prop', nargs=2, type=click.Path(exists=True, readable=True), help='Option to propagate error. Requires two arguments: 1) pre-event uncertainties in GeoTIFF format, 2) post-event uncertainties in GeoTIFF format.')
 @click.option('--outname', type=str, help='Optional base filename to use for output files.')
-def piv(before_height, after_height, template_size, step_size, prop, outname):
+def piv(before, after, template_size, step_size, prop, outname):
     '''
     Runs PIV on a pair pre- and post-event DEMs.
 
@@ -26,16 +26,9 @@ def piv(before_height, after_height, template_size, step_size, prop, outname):
                STEP_SIZE      Size of template step in pixels
     '''
     # Format user input
-    user_input = format_input(
-        before,
-        after,
-        template_size,
-        step_size,
-        before_uncertainty,
-        after_uncertainty,
-        prop,
-        output_base_name
-    )
+    user_input = format_input(before, after,
+                              template_size,step_size,
+                              prop, outname)
 
     # Ingest user supplied before and after GeoTIFF image data
     image_data = ingest_data(user_input)
