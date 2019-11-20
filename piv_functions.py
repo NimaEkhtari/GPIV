@@ -109,7 +109,7 @@ def run_piv(user_input, image_data):
     piv.correlate(user_input["template_size"],
                   user_input["step_size"],
                   user_input["propagate"])
-    piv.compute_cumulative()
+    piv.compute_total()
 
     # Estimate and add bias variance if propagating uncertainty
     if user_input["propagate"]:
@@ -168,7 +168,7 @@ class Piv:
         window_data = self._get_windows(template_size, step_size, propagate)
 
         for record in window_data:
-            # Display current analysis area
+            # Display progress
             self._show_piv_location(before_axis, after_axis,
                                     record[1][0], record[1][1],
                                     record[2][0], record[2][1],
@@ -186,14 +186,14 @@ class Piv:
 
             # Propagate uncertainty if requrested and store
             if propagate:
-                self._propagate_uncertainty(record, ncc, max_idx, subpixel_peak)
+                self._propagate_uncertainty(record, ncc, 
+                                            max_idx, subpixel_peak)
 
         # All done. Close progress display figure
         plt.close(status_figure)
 
 
     def deform(self, template_size, step_size, propagate):
-
         # Create a NaN image for each vector component (u and v)
         search_size = template_size*2
         num_hz_comps = math.floor((self._before.shape[1] - search_size)
@@ -234,8 +234,8 @@ class Piv:
         temp_piv_v = []
         for vt_count in range(num_vt_comps):
             for hz_count in range(num_hz_comps):
-                temp_piv_origins.append((hz_count*step_size + template_size,
-                                         vt_count*step_size + template_size))
+                temp_piv_origins.append([hz_count*step_size + template_size,
+                                         vt_count*step_size + template_size])
                 row = vt_count
                 col = hz_count
                 temp_piv_u.append(u_smooth[row, col])
@@ -243,93 +243,91 @@ class Piv:
         temp_piv_origins = np.asarray(temp_piv_origins)
         temp_piv_u = np.asarray(temp_piv_u)
         temp_piv_v = np.asarray(temp_piv_v)
-        after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_v, -temp_piv_u, angles='xy', scale_units='xy')
+        after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
         plt.show()
 
-        quit()
-        
-
-        # # cubic interpolation of grid of vectors for each pixel
-        # print('here1')
-        # piv_origins = np.asarray(temp_piv_origins)
-        # temp_piv_u = np.asarray(temp_piv_u)
-        # temp_piv_v = np.asarray(temp_piv_v)
-        # u_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_u[:], kind='cubic')
-        # v_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_v[:], kind='cubic')
-        # image_u_coords = np.arange(self._after_height.shape[1])
-        # image_v_coords = np.arange(self._after_height.shape[0])
-        # self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
-        # self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
-        # self._deformation_field_u_total += self._deformation_field_u
-        # self._deformation_field_v_total += self._deformation_field_v
-        # print('here2')
+        # cubic interpolation of grid of vectors for each pixel
+        piv_origins = np.asarray(temp_piv_origins)
+        temp_piv_u = np.asarray(temp_piv_u)
+        temp_piv_v = np.asarray(temp_piv_v)
+        u_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_u[:], kind='cubic')
+        v_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_v[:], kind='cubic')
+        image_u_coords = np.arange(self._after.shape[1])
+        image_v_coords = np.arange(self._after.shape[0])
+        self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
+        self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
+        self._deformation_field_u_total += self._deformation_field_u
+        self._deformation_field_v_total += self._deformation_field_v
+        # status figure
+        status_figure = plt.figure()
+        axu = plt.subplot(1,2,1)
+        axu.imshow(self._deformation_field_u_total)
+        axv = plt.subplot(1,2,2)
+        axv.imshow(self._deformation_field_v_total)
+        plt.show()
 
         # status_figure = plt.figure()
         # computed_axis = plt.subplot(1, 2, 1)
         # interpolated_axis = plt.subplot(1, 2, 2)
         # computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], temp_piv_u[:], temp_piv_v[:],angles='xy',scale_units='xy')
         # computed_axis.axis('equal')
-        # image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
-        # interpolated_axis.quiver(image_u_coords[::2,::2],-image_v_coords[::2,::2],self._deformation_field_u[::2,::2],self._deformation_field_v[::2,::2],angles='xy',scale_units='xy')
+        # image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
+        # interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
         # interpolated_axis.axis('equal')
         # plt.show()
 
-        # robust smooth interpolation of grid of vectors for each pixel
-        image_u_coords = np.empty(self._after_height.shape)
-        image_u_coords[:] = np.nan
-        image_v_coords = image_u_coords.copy()
-        print(temp_piv_origins)
-        for i in range(len(temp_piv_origins)):
-            image_u_coords[temp_piv_origins[i]] = temp_piv_u[i]
-            image_v_coords[temp_piv_origins[i]] = temp_piv_v[i]
-
-        plt.imshow(image_v_coords)
-        plt.show()
-
-        u_smooth, s = robust_smooth_2d(image_u_coords, robust=True)
-        v_smooth, s = robust_smooth_2d(image_v_coords, robust=True)
-
-        status_figure = plt.figure()
-        u_axis = plt.subplot(1, 4, 1)
-        v_axis = plt.subplot(1, 4, 2)
-        u_axis.imshow(image_u_coords)
-        v_axis.imshow(image_v_coords)
-        us_axis = plt.subplot(1, 4, 3)
-        vs_axis = plt.subplot(1, 4, 4)
-        us_axis.imshow(u_smooth)
-        vs_axis.imshow(v_smooth)
-        plt.show()
-
-        quit()
-
-
         # deform 'after' images using cubic spline interpolation on the interpolated vector grid
-        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after_height.shape[1]), np.arange(self._after_height.shape[0]))
-        u_height_coord = image_u_coords + self._deformation_field_u
-        v_height_coord = image_v_coords + self._deformation_field_v
-        self._after_height_deformed = ndimage.map_coordinates(
-            self._after_height_deformed,
-            [v_height_coord.ravel(), u_height_coord.ravel()],
+        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
+        u_coord = image_u_coords + self._deformation_field_u
+        v_coord = image_v_coords - self._deformation_field_v
+        self._after_deformed = ndimage.map_coordinates(
+            self._after_deformed,
+            [v_coord.ravel(), u_coord.ravel()],
             order=3,
             mode='nearest'
-        ).reshape(self._after_height_deformed.shape)
+        ).reshape(self._after_deformed.shape)
         if propagate:
             self._after_uncertainty_deformed = ndimage.map_coordinates(
                 self._after_uncertainty_deformed,
-                [v_height_coord.ravel(), u_height_coord.ravel()],
+                [v_coord.ravel(), u_coord.ravel()],
                 order=3,
                 mode='nearest'
-            ).reshape(self._after_height_deformed.shape)
-        
-        print('here3')
-        status_figure = plt.figure()
-        original_axis = plt.subplot(1, 2, 1)
-        deformed_axis = plt.subplot(1, 2, 2)
-        original_axis.set_title('Original')
-        original_axis.imshow(self._after_height, cmap=plt.cm.gray)
-        deformed_axis.set_title('Deformed')
-        deformed_axis.imshow(self._after_height_deformed, cmap=plt.cm.gray)
+            ).reshape(self._after_deformed.shape)
+
+        # status_figure = plt.figure()
+        # original_axis = plt.subplot(1, 3, 1)
+        # deformed_axis = plt.subplot(1, 3, 3)
+        # before_axis = plt.subplot(1, 3, 2)
+        # original_axis.set_title('Original After')
+        # original_axis.imshow(self._after, cmap=plt.cm.gray)
+        # deformed_axis.set_title('Deformed After')
+        # deformed_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
+        # before_axis.set_title('Before')
+        # before_axis.imshow(self._before, cmap=plt.cm.gray)
+        # plt.show()
+
+
+    def compute_total(self):
+        for i in range(len(self._piv_origins)):
+            # cumulative piv vectors from iterations prior to final iteration
+            u_cumulative = self._deformation_field_u_total[
+                self._piv_origins[i][1],
+                self._piv_origins[i][0]
+            ]
+            v_cumulative = self._deformation_field_v_total[
+                self._piv_origins[i][1],
+                self._piv_origins[i][0]
+            ]
+            # Update PIV vectors with cumulative vectors from prior iterations
+            self._piv_vectors[i][0] += u_cumulative
+            self._piv_vectors[i][1] += v_cumulative
+
+        piv_origins = np.asarray(self._piv_origins)
+        piv_vectors = np.asarray(self._piv_vectors)
+        plt.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], piv_vectors[:,1],angles='xy',scale_units='xy')
+        plt.axis('equal')
         plt.show()
+
 
     def compute_bias(self):
         piv_vectors = np.asarray(self._piv_vectors)
@@ -516,8 +514,8 @@ class Piv:
         # All done. Store and return subpixel peak
         self._piv_origins.append(origin)
         self._piv_vectors.append(
-            (max_idx[1] - (template_size+1)/2 + hz_delta,
-             max_idx[0] - (template_size+1)/2 + vt_delta)
+            [max_idx[1] - (template_size+1)/2 + hz_delta,
+             max_idx[0] - (template_size+1)/2 + vt_delta]
         )
         return [hz_delta, vt_delta]
 
