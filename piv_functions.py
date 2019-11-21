@@ -210,8 +210,10 @@ class Piv:
             u_img[row,col] = self._piv_vectors[i][0]
             v_img[row,col] = -self._piv_vectors[i][1]
         # Smooth the u and v vector component images
-        u_smooth, s = robust_smooth_2d(u_img, robust=True)
-        v_smooth, s = robust_smooth_2d(v_img, robust=True)
+        u_smooth, s = robust_smooth_2d(u_img, robust=True, s=0.00005)
+        print("u s = {}".format(s))
+        v_smooth, s = robust_smooth_2d(v_img, robust=True, s=0.00005)
+        print("v s = {}".format(s))
 
         # Status figure of before and after smoothing
         status_figure = plt.figure()
