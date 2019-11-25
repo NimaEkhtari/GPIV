@@ -398,17 +398,17 @@ class Piv:
         local = ncc[max_idx[0]-1:max_idx[0]+2, 
                     max_idx[1]-1:max_idx[1]+2]
 
-        dx = (local[1,2] - local[1,0]) / 2
-        dxx = local[1,2] + local[1,0] - 2*local[1,1]
-        dy = (local[2,1] - local[0,1]) / 2
-        dyy = local[2,1] + local[0,1] - 2*local[1,1]
-        dxy = (local[2,2] - local[2,0] - local[0,2] + local[0,0]) / 4
+        du = (local[1,2] - local[1,0]) / 2
+        duu = local[1,2] + local[1,0] - 2*local[1,1]
+        dv = (local[2,1] - local[0,1]) / 2
+        dvv = local[2,1] + local[0,1] - 2*local[1,1]
+        duv = (local[2,2] - local[2,0] - local[0,2] + local[0,0]) / 4
         
-        # hz_delta is positive left-to-right; vt_delta is positive top-to-bottom
-        hz_delta = -(dyy*dx - dxy*dy) / (dxx*dyy - dxy*dxy)
-        vt_delta = -(dxx*dy - dxy*dx) / (dxx*dyy - dxy*dxy)
+        # u_delta is positive left-to-right; v_delta is positive top-to-bottom
+        u_delta = -(dvv*du - duv*dv) / (duu*dvv - duv*duv)
+        v_delta = -(duu*dv - duv*du) / (duu*dvv - duv*duv)
 
-        return [hz_delta, vt_delta]
+        return [u_delta, v_delta]
 
 
     def _store_origin_vector(self, origin, max_idx,
