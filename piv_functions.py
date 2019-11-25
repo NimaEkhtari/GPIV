@@ -116,7 +116,9 @@ def run_piv(user_input, image_data):
         estimate_bias(piv, user_input, image_data)
 
     # All done. Export the PIV vectors and uncertainties and show results
-    # piv.export(user_input)
+    piv.export(user_input, image_data)
+    if user_input["propagate"]:
+        piv.export_uncertainty(user_input)
     # show_functions.show(before_height_file,
     #                          output_base_name + 'vectors.json',
     #                          output_base_name + 'covariances.json',
@@ -131,8 +133,8 @@ def estimate_bias(piv, user_input, image_data):
                        user_input["step_size"],
                        False)
     image_data["after"] = temp
-    x_bias_variance, y_bias_variance = piv_bias.compute_bias()
-    piv.add_bias(x_bias_variance, y_bias_variance)
+    u_bias_variance, v_bias_variance = piv_bias.compute_bias()
+    piv.add_bias(u_bias_variance, v_bias_variance)
 
 
 class Piv:
@@ -147,7 +149,7 @@ class Piv:
         self._deformation_field_u_total = np.zeros(image_data["after"].shape)
         self._deformation_field_v = np.zeros(image_data["after"].shape)
         self._deformation_field_v_total = np.zeros(image_data["after"].shape)
-        self._partial_derivative_increment = 0.000001
+        self._delta = 0.000001  # Partial derivative increment
         self._piv_vectors = []
         self._piv_origins = []
         self._final_vectors = []
@@ -176,137 +178,47 @@ class Piv:
 
             # Compute normalized cross-correlation (NCC)
             ncc = match_template(record[4], record[3])
-            max_idx = np.where(ncc == np.max(ncc))
+            max_idx = np.squeeze(np.asarray(np.where(ncc == np.max(ncc))))
 
-            # Interpolate and store sub-pixel NCC peak
-            subpixel_peak = self._subpixel_peak(ncc,
-                                                max_idx,
-                                                record[0],
-                                                template_size)
+            # Check for peak location on edges of NCC matrix - this breaks
+            # the sub-pixel peak interpolation
+            if (max_idx[0]==0 or 
+                    max_idx[1]==0 or
+                    max_idx[0]==ncc.shape[0]-1 or
+                    max_idx[1]==ncc.shape[1]-1):
+                continue
 
-            # Propagate uncertainty if requrested and store
+            # Solve sub-pixel NCC peak
+            subpixel_peak = self._subpixel_peak(ncc, max_idx)
+
+            # Store PIV origin and vector
+            self._store_origin_vector(record[0], max_idx,
+                                      template_size, subpixel_peak)
+
+            # Propagate uncertainty if requested and store
             if propagate:
-                self._propagate_uncertainty(record, ncc, 
-                                            max_idx, subpixel_peak)
+                self._propagate_uncertainty(record, ncc, max_idx,
+                                            subpixel_peak, template_size)
 
         # All done. Close progress display figure
         plt.close(status_figure)
 
 
     def deform(self, template_size, step_size, propagate):
-        # Create a NaN image for each vector component (u and v)
-        search_size = template_size*2
-        num_hz_comps = math.floor((self._before.shape[1] - search_size)
-                                   / step_size)
-        num_vt_comps = math.floor((self._before.shape[0] - search_size)
-                                   / step_size)
-        u_img = np.empty((num_vt_comps, num_hz_comps))
-        u_img[:] = np.nan
-        v_img = u_img.copy()
-        # Overwrite the NaN values where valid PIV vectors exist
-        for i in range(len(self._piv_origins)):
-            row = int((self._piv_origins[i][1] - template_size)/step_size)
-            col = int((self._piv_origins[i][0] - template_size)/step_size)
-            u_img[row,col] = self._piv_vectors[i][0]
-            v_img[row,col] = -self._piv_vectors[i][1]
-        # Smooth the u and v vector component images
-        u_smooth, s = robust_smooth_2d(u_img, robust=True, s=0.00005)
-        print("u s = {}".format(s))
-        v_smooth, s = robust_smooth_2d(v_img, robust=True, s=0.00005)
-        print("v s = {}".format(s))
+        # Filter outlier PIV vectors
+        filtered_origins, filtered_vectors = self._filter_vectors(
+            template_size,
+            step_size
+        )
 
-        # Status figure of before and after smoothing
-        status_figure = plt.figure()
-        u_axis = plt.subplot(2, 3, 1)
-        v_axis = plt.subplot(2, 3, 2)
-        u_axis.imshow(u_img)
-        v_axis.imshow(v_img)
-        before_axis = plt.subplot(2, 3, 3)
-        piv_origins = np.asarray(self._piv_origins)
-        piv_vectors = np.asarray(self._piv_vectors)
-        before_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1], angles='xy', scale_units='xy')
-        before_axis.axis('equal') 
-        u_axis_smooth = plt.subplot(2, 3, 4)
-        v_axis_smooth = plt.subplot(2, 3, 5)
-        u_axis_smooth.imshow(u_smooth)
-        v_axis_smooth.imshow(v_smooth)
-        after_axis = plt.subplot(2, 3, 6)
-        temp_piv_origins = []
-        temp_piv_u = []
-        temp_piv_v = []
-        for vt_count in range(num_vt_comps):
-            for hz_count in range(num_hz_comps):
-                temp_piv_origins.append([hz_count*step_size + template_size,
-                                         vt_count*step_size + template_size])
-                row = vt_count
-                col = hz_count
-                temp_piv_u.append(u_smooth[row, col])
-                temp_piv_v.append(v_smooth[row, col])
-        temp_piv_origins = np.asarray(temp_piv_origins)
-        temp_piv_u = np.asarray(temp_piv_u)
-        temp_piv_v = np.asarray(temp_piv_v)
-        after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
-        plt.show()
+        # Interpolate grid of vectors for each DEM pixel
+        self._interpolate_vectors(
+            filtered_origins,
+            filtered_vectors
+        )
 
-        # cubic interpolation of grid of vectors for each pixel
-        piv_origins = np.asarray(temp_piv_origins)
-        temp_piv_u = np.asarray(temp_piv_u)
-        temp_piv_v = np.asarray(temp_piv_v)
-        u_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_u[:], kind='cubic')
-        v_interpolator = interpolate.interp2d(piv_origins[:,0], piv_origins[:,1], temp_piv_v[:], kind='cubic')
-        image_u_coords = np.arange(self._after.shape[1])
-        image_v_coords = np.arange(self._after.shape[0])
-        self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
-        self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
-        self._deformation_field_u_total += self._deformation_field_u
-        self._deformation_field_v_total += self._deformation_field_v
-        # status figure
-        status_figure = plt.figure()
-        axu = plt.subplot(1,2,1)
-        axu.imshow(self._deformation_field_u_total)
-        axv = plt.subplot(1,2,2)
-        axv.imshow(self._deformation_field_v_total)
-        plt.show()
-
-        # status_figure = plt.figure()
-        # computed_axis = plt.subplot(1, 2, 1)
-        # interpolated_axis = plt.subplot(1, 2, 2)
-        # computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], temp_piv_u[:], temp_piv_v[:],angles='xy',scale_units='xy')
-        # computed_axis.axis('equal')
-        # image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
-        # interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
-        # interpolated_axis.axis('equal')
-        # plt.show()
-
-        # deform 'after' images using cubic spline interpolation on the interpolated vector grid
-        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
-        u_coord = image_u_coords + self._deformation_field_u
-        v_coord = image_v_coords - self._deformation_field_v
-        self._after_deformed = ndimage.map_coordinates(
-            self._after_deformed,
-            [v_coord.ravel(), u_coord.ravel()],
-            order=3,
-            mode='nearest'
-        ).reshape(self._after_deformed.shape)
-        if propagate:
-            self._after_uncertainty_deformed = ndimage.map_coordinates(
-                self._after_uncertainty_deformed,
-                [v_coord.ravel(), u_coord.ravel()],
-                order=3,
-                mode='nearest'
-            ).reshape(self._after_deformed.shape)
-
-        # status_figure = plt.figure()
-        # original_axis = plt.subplot(1, 3, 1)
-        # deformed_axis = plt.subplot(1, 3, 3)
-        # before_axis = plt.subplot(1, 3, 2)
-        # original_axis.set_title('Original After')
-        # original_axis.imshow(self._after, cmap=plt.cm.gray)
-        # deformed_axis.set_title('Deformed After')
-        # deformed_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
-        # before_axis.set_title('Before')
-        # before_axis.imshow(self._before, cmap=plt.cm.gray)
-        # plt.show()
+        # Deform the 'After' DEM and uncertainty map
+        self._deform_images(propagate)
 
 
     def compute_total(self):
@@ -324,51 +236,42 @@ class Piv:
             self._piv_vectors[i][0] += u_cumulative
             self._piv_vectors[i][1] += v_cumulative
 
-        piv_origins = np.asarray(self._piv_origins)
-        piv_vectors = np.asarray(self._piv_vectors)
-        plt.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], piv_vectors[:,1],angles='xy',scale_units='xy')
-        plt.axis('equal')
-        plt.show()
+        # # Status
+        # piv_origins = np.asarray(self._piv_origins)
+        # piv_vectors = np.asarray(self._piv_vectors)
+        # plt.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], piv_vectors[:,1],angles='xy',scale_units='xy')
+        # plt.axis('equal')
+        # plt.show()
 
 
     def compute_bias(self):
         piv_vectors = np.asarray(self._piv_vectors)
-        x_bias_variance = np.var(piv_vectors[:,0])
-        y_bias_variance = np.var(piv_vectors[:,1])
-        return [x_bias_variance, y_bias_variance]
+        u_bias_variance = np.var(piv_vectors[:,0])
+        v_bias_variance = np.var(piv_vectors[:,1])
+        return [u_bias_variance, v_bias_variance]
 
-    def add_bias(self, x_bias_variance, y_bias_variance):
+
+    def add_bias(self, u_bias_variance, v_bias_variance):
         for covariance in self._peak_covariance:
-            covariance[0][0] += x_bias_variance
-            covariance[1][1] += y_bias_variance
+            covariance[0][0] += u_bias_variance
+            covariance[1][1] += v_bias_variance
 
-    def export(self, user_input):
-        # get the total vector at each origin
-        piv_vectors = []
-        for origin in self._piv_origins:
-            piv_vectors.append((
-                self._deformation_field_u_total[origin[1], origin[0]],
-                self._deformation_field_v_total[origin[1], origin[0]]
-            ))
 
+    def export(self, user_input, image_data):
         # Convert from pixels to ground distance
         piv_origins = np.asarray(self._piv_origins, dtype=np.float64)
-        piv_origins *= geo_transform[0,0]  # Scale by pixel ground size
-        piv_origins[:,0] += geo_transform[0,2]  # Offset by leftmost pixel to get ground coordinate
-        piv_origins[:,1] = geo_transform[1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate    
-        piv_vectors = np.asarray(piv_vectors)
-        piv_vectors *= geo_transform[0,0]  # Scale by pixel ground size
+        piv_origins *= image_data["geo_transform"][0,0]  # Scale by pixel ground size
+        piv_origins[:,0] += image_data["geo_transform"][0,2]  # Offset by leftmost pixel to get ground coordinate
+        piv_origins[:,1] = image_data["geo_transform"][1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate    
+        piv_vectors = np.asarray(self._piv_vectors)
+        piv_vectors *= image_data["geo_transform"][0,0]  # Scale by pixel ground size
         
         origins_vectors = np.concatenate((piv_origins, piv_vectors), axis=1)
-        json.dump(origins_vectors.tolist(), open(output_base_name + "vectors.json", "w"))
-        print("PIV displacement vectors saved to file '{}vectors.json'".format(output_base_name))
+        json.dump(origins_vectors.tolist(), open(user_input["output_base_name"] + "vectors.json", "w"))
+        print("PIV displacement vectors saved to file '{}vectors.json'".format(user_input["output_base_name"]))
 
-    def export_uncertainty(piv_origins,
-                        piv_vectors,
-                        peak_covariance,
-                        geo_transform,
-                        output_base_name):
 
+    def export_uncertainty(input_data, image_data):
         # Convert from pixels to ground distance
         piv_origins = np.asarray(piv_origins)        
         piv_origins *= geo_transform[0,0]  # Scale by pixel ground size
@@ -490,18 +393,10 @@ class Piv:
         plt.pause(0.1)
 
 
-    def _subpixel_peak(self, ncc, max_idx, origin, template_size):
-        # Check for peak location on edges of NCC matrix - this breaks
-        # the sub-pixel peak interpolation
-        if (max_idx[0]==0 or 
-                max_idx[1]==0 or
-                max_idx[0]==ncc.shape[0]-1 or
-                max_idx[1]==ncc.shape[1]-1): 
-            return False
-
+    def _subpixel_peak(self, ncc, max_idx):
         # Extract 3x3 submatrix centered on NCC maximum pixel
-        local = ncc[max_idx[0][0]-1:max_idx[0][0]+2, 
-                    max_idx[1][0]-1:max_idx[1][0]+2]
+        local = ncc[max_idx[0]-1:max_idx[0]+2, 
+                    max_idx[1]-1:max_idx[1]+2]
 
         dx = (local[1,2] - local[1,0]) / 2
         dxx = local[1,2] + local[1,0] - 2*local[1,1]
@@ -513,20 +408,19 @@ class Piv:
         hz_delta = -(dyy*dx - dxy*dy) / (dxx*dyy - dxy*dxy)
         vt_delta = -(dxx*dy - dxy*dx) / (dxx*dyy - dxy*dxy)
 
-        # All done. Store and return subpixel peak
-        self._piv_origins.append(origin)
-        self._piv_vectors.append(
-            [max_idx[1] - (template_size+1)/2 + hz_delta,
-             max_idx[0] - (template_size+1)/2 + vt_delta]
-        )
         return [hz_delta, vt_delta]
 
 
-    def _propagate_uncertainty(self, record, ncc, max_idx, subpixel_peak):
-        # Check for valid subpixel peak location
-        if not subpixel_peak:
-            return
+    def _store_origin_vector(self, origin, max_idx,
+                             template_size, subpixel_peak):
+        self._piv_origins.append(origin)
+        self._piv_vectors.append(
+            [max_idx[1] - (template_size+1)/2 + subpixel_peak[0],
+             max_idx[0] - (template_size+1)/2 + subpixel_peak[1]])
 
+
+    def _propagate_uncertainty(self, record, ncc, max_idx,
+                               subpixel_peak, template_size):
         # Propagate raster error into the 3x3 patch of correlation values that 
         # are centered on the correlation peak
         correlation_covariance = self._propagate_pixel_into_correlation(
@@ -541,14 +435,13 @@ class Piv:
             # 3x3 array of correlation values centered on the correlation peak
             ncc[max_idx[0]-1:max_idx[0]+2,
                 max_idx[1]-1:max_idx[1]+2], 
-            self._partial_derivative_increment) 
+            self._delta) 
 
         # Propagate the correlation covariance into the subpixel peak location
         peak_covariance = self._propagate_correlation_into_subpixel_peak(
             ncc[max_idx[0]-1:max_idx[0]+2, max_idx[1]-1:max_idx[1]+2],
             correlation_covariance,
             subpixel_peak,
-            self._partial_derivative_increment
         )
 
         # All done. Store.
@@ -561,12 +454,12 @@ class Piv:
                                           height_search,
                                           uncertainty_search,
                                           normalized_cross_correlation,
-                                          numeric_partial_derivative_increment):
+                                          numeric_delta):
         template_covariance_vector = np.square(uncertainty_template.reshape(uncertainty_template.size,)) # convert array to vector, row-by-row, and square the standard deviations into variances
         search_covariance_vector = np.square(uncertainty_search.reshape(uncertainty_search.size,))
         covariance_matrix = np.diag(np.hstack((template_covariance_vector, search_covariance_vector)))
 
-        jacobian = self._get_correlation_jacobian(height_template, height_search, normalized_cross_correlation, numeric_partial_derivative_increment)    
+        jacobian = self._get_correlation_jacobian(height_template, height_search, normalized_cross_correlation, numeric_delta)    
         # Propagate the template and search area errors into the 9 correlation elements
         # The covariance order is by row of the normalized_cross_correlation (ncc) array (i.e., ncc[0,0], ncc[0,1], ncc[0,2], ncc[1,0], ncc[1,1], ...)
         correlation_covariance = np.matmul(jacobian,np.matmul(covariance_matrix,jacobian.T))
@@ -575,7 +468,7 @@ class Piv:
 
     def _get_correlation_jacobian(self, template, search,
                                   normalized_cross_correlation,
-                                  numeric_partial_derivative_increment):
+                                  numeric_delta):
 
         number_template_rows, number_template_columns = template.shape
         number_search_rows, number_search_columns = search.shape
@@ -596,9 +489,9 @@ class Piv:
                 for row_template in range(number_template_rows):
                     for col_template in range(number_template_columns):
                         perturbed_template = template.copy()
-                        perturbed_template[row_template,col_template] += numeric_partial_derivative_increment
+                        perturbed_template[row_template,col_template] += numeric_delta
                         perturbed_search_subarea = search_subarea.copy()
-                        perturbed_search_subarea[row_template,col_template] += numeric_partial_derivative_increment
+                        perturbed_search_subarea[row_template,col_template] += numeric_delta
 
                         # spatial domain normalized cross correlation (i.e., does not use the FFT)
                         # about 20x faster than using skimage's FFT based match_template method
@@ -608,8 +501,8 @@ class Piv:
                         perturbed_search_subarea_normalized_cross_correlation = np.sum(normalized_template * normalized_perturbed_search_subarea) / template.size
                         
                         # storage location adjustment by row_correlation and col_correlation accounts for the larger size of the search area than the template area
-                        template_partial_derivatives[row_template, col_template] = (perturbed_template_normalized_cross_correlation - normalized_cross_correlation[row_correlation,col_correlation]) / numeric_partial_derivative_increment
-                        search_partial_derivatives[row_correlation+row_template, col_correlation+col_template] = (perturbed_search_subarea_normalized_cross_correlation - normalized_cross_correlation[row_correlation, col_correlation]) / numeric_partial_derivative_increment 
+                        template_partial_derivatives[row_template, col_template] = (perturbed_template_normalized_cross_correlation - normalized_cross_correlation[row_correlation,col_correlation]) / numeric_delta
+                        search_partial_derivatives[row_correlation+row_template, col_correlation+col_template] = (perturbed_search_subarea_normalized_cross_correlation - normalized_cross_correlation[row_correlation, col_correlation]) / numeric_delta 
 
                 # reshape the partial derivatives from their current array form to vector form and store in the Jacobian
                 # we match the row-by-row pattern used to form the covariance matrix in the calling function
@@ -618,20 +511,175 @@ class Piv:
 
         return jacobian
 
-    def _propagate_correlation_into_subpixel_peak(correlation,
+    def _propagate_correlation_into_subpixel_peak(self,
+                                                  correlation,
                                                   correlation_covariance,
-                                                  subpixel_peak,
-                                                  numeric_partial_derivative_increment):
+                                                  subpixel_peak):
         jacobian = np.zeros((2,9))
-        # cycle through the 3x3 correlation array, row-by-row, and create the jacobian matrix
-        for row_correlation in range(3):
-            for col_correlation in range(3):
+        # Cycle through the 3x3 correlation array, row-by-row, and create the
+        # jacobian matrix
+        for row in range(3):
+            for col in range(3):
                 perturbed_correlation = correlation.copy()
-                perturbed_correlation[row_correlation,col_correlation] += numeric_partial_derivative_increment            
-                perturbed_hz_delta, perturbed_vt_delta = get_subpixel_peak(perturbed_correlation)            
-                jacobian[0,row_correlation*3+col_correlation] = (perturbed_hz_delta - subpixel_peak[0]) / numeric_partial_derivative_increment
-                jacobian[1,row_correlation*3+col_correlation] = (perturbed_vt_delta - subpixel_peak[1]) / numeric_partial_derivative_increment        
-        # propagate the 3x3 array of correlation uncertainties into the sub-pixel U and V direction offsets
-        subpixel_peak_covariance = np.matmul(jacobian, np.matmul(correlation_covariance, jacobian.T))
-            
+                perturbed_correlation[row,col] += self._delta
+                hz_delta, vt_delta = self._subpixel_peak(perturbed_correlation,
+                                                         [1, 1])
+                jacobian[0,row*3+col] = ((hz_delta - subpixel_peak[0])
+                                          / self._delta)
+                jacobian[1,row*3+col] = ((vt_delta - subpixel_peak[1])
+                                          / self._delta)
+        # Propagate the 3x3 array of correlation uncertainties into the 
+        # sub-pixel u and v PIV vector components
+        subpixel_peak_covariance = np.matmul(
+            jacobian,
+            np.matmul(correlation_covariance, jacobian.T)
+        )
+
         return subpixel_peak_covariance
+
+
+    def _filter_vectors(self, template_size, step_size):
+        # Create a NaN image for each vector component (u and v)
+        search_size = template_size*2
+        num_hz_comps = math.floor((self._before.shape[1] - search_size)
+                                   / step_size)
+        num_vt_comps = math.floor((self._before.shape[0] - search_size)
+                                   / step_size)
+        u_img = np.empty((num_vt_comps, num_hz_comps))
+        u_img[:] = np.nan
+        v_img = u_img.copy()
+        # Overwrite the NaN values where valid PIV vectors exist
+        for i in range(len(self._piv_origins)):
+            row = int((self._piv_origins[i][1] - template_size)/step_size)
+            col = int((self._piv_origins[i][0] - template_size)/step_size)
+            u_img[row,col] = self._piv_vectors[i][0]
+            v_img[row,col] = -self._piv_vectors[i][1]
+        # Smooth the u and v vector component images
+        u_smooth, s = robust_smooth_2d(u_img, robust=True, s=0.00005)
+        v_smooth, s = robust_smooth_2d(v_img, robust=True, s=0.00005)
+
+        # Transform origins and vectors back to a list format
+        filtered_origins = []
+        filtered_vectors = []
+        for vt_count in range(num_vt_comps):
+            for hz_count in range(num_hz_comps):
+                filtered_origins.append([hz_count*step_size + template_size,
+                                         vt_count*step_size + template_size])
+                filtered_vectors.append([u_smooth[vt_count, hz_count],
+                                         v_smooth[vt_count, hz_count]])
+
+        # # Status figure of before and after smoothing
+        # status_figure = plt.figure()
+        # u_axis = plt.subplot(2, 3, 1)
+        # v_axis = plt.subplot(2, 3, 2)
+        # u_axis.imshow(u_img)
+        # v_axis.imshow(v_img)
+        # before_axis = plt.subplot(2, 3, 3)
+        # piv_origins = np.asarray(self._piv_origins)
+        # piv_vectors = np.asarray(self._piv_vectors)
+        # before_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1], angles='xy', scale_units='xy')
+        # before_axis.axis('equal') 
+        # u_axis_smooth = plt.subplot(2, 3, 4)
+        # v_axis_smooth = plt.subplot(2, 3, 5)
+        # u_axis_smooth.imshow(u_smooth)
+        # v_axis_smooth.imshow(v_smooth)
+        # after_axis = plt.subplot(2, 3, 6)
+        # temp_piv_origins = []
+        # temp_piv_u = []
+        # temp_piv_v = []
+        # for vt_count in range(num_vt_comps):
+        #     for hz_count in range(num_hz_comps):
+        #         temp_piv_origins.append([hz_count*step_size + template_size,
+        #                                  vt_count*step_size + template_size])
+        #         row = vt_count
+        #         col = hz_count
+        #         temp_piv_u.append(u_smooth[row, col])
+        #         temp_piv_v.append(v_smooth[row, col])
+        # temp_piv_origins = np.asarray(temp_piv_origins)
+        # temp_piv_u = np.asarray(temp_piv_u)
+        # temp_piv_v = np.asarray(temp_piv_v)
+        # after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
+        # plt.show()
+
+        return filtered_origins, filtered_vectors
+
+
+    def _interpolate_vectors(self, filtered_origins, filtered_vectors):
+        # Cubic interpolation of grid of vectors for each pixel
+        piv_origins = np.asarray(filtered_origins)
+        piv_vectors = np.asarray(filtered_vectors)
+        temp_piv_u = piv_vectors[:,0]
+        temp_piv_v = piv_vectors[:,1]
+        u_interpolator = interpolate.interp2d(
+            piv_origins[:,0],
+            piv_origins[:,1],
+            temp_piv_u[:],
+            kind='cubic'
+        )
+        v_interpolator = interpolate.interp2d(
+            piv_origins[:,0],
+            piv_origins[:,1],
+            temp_piv_v[:],
+            kind='cubic'
+        )
+        image_u_coords = np.arange(self._after.shape[1])
+        image_v_coords = np.arange(self._after.shape[0])
+        self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
+        self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
+        self._deformation_field_u_total += self._deformation_field_u
+        self._deformation_field_v_total += self._deformation_field_v
+
+        # # status figure
+        # status_figure = plt.figure()
+        # axu = plt.subplot(1,2,1)
+        # axu.imshow(self._deformation_field_u_total)
+        # axv = plt.subplot(1,2,2)
+        # axv.imshow(self._deformation_field_v_total)
+        # plt.show()
+
+        # status_figure = plt.figure()
+        # computed_axis = plt.subplot(1, 2, 1)
+        # interpolated_axis = plt.subplot(1, 2, 2)
+        # computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], temp_piv_u[:], temp_piv_v[:],angles='xy',scale_units='xy')
+        # computed_axis.axis('equal')
+        # image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
+        # interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
+        # interpolated_axis.axis('equal')
+        # plt.show()
+
+
+    def _deform_images(self, propagate):
+         # Deform the 'After' DEM
+        image_u_coords, image_v_coords = np.meshgrid(
+            np.arange(self._after.shape[1]),
+            np.arange(self._after.shape[0])
+        )
+        u_coord = image_u_coords + self._deformation_field_u_total
+        v_coord = image_v_coords - self._deformation_field_v_total
+        self._after_deformed = ndimage.map_coordinates(
+            self._after,
+            [v_coord.ravel(), u_coord.ravel()],
+            order=3,
+            mode='nearest'
+        ).reshape(self._after.shape)
+        
+        # Deform the 'After' uncertainty image if propagating uncertainty
+        if propagate:
+            self._after_uncertainty_deformed = ndimage.map_coordinates(
+                self._after_uncertainty,
+                [v_coord.ravel(), u_coord.ravel()],
+                order=3,
+                mode='nearest'
+            ).reshape(self._after_uncertainty.shape)
+
+        # status_figure = plt.figure()
+        # original_axis = plt.subplot(1, 3, 1)
+        # deformed_axis = plt.subplot(1, 3, 3)
+        # before_axis = plt.subplot(1, 3, 2)
+        # original_axis.set_title('Original After')
+        # original_axis.imshow(self._after, cmap=plt.cm.gray)
+        # deformed_axis.set_title('Deformed After')
+        # deformed_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
+        # before_axis.set_title('Before')
+        # before_axis.imshow(self._before, cmap=plt.cm.gray)
+        # plt.show()
