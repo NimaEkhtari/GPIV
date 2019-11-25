@@ -1,7 +1,6 @@
 import sys
 import math
 import json
-import heapq
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -115,14 +114,23 @@ def run_piv(user_input, image_data):
     if user_input["propagate"]:
         estimate_bias(piv, user_input, image_data)
 
-    # All done. Export the PIV vectors and uncertainties and show results
+    # All done. Export the PIV vectors and uncertainties to JSON files
     piv.export(user_input, image_data)
     if user_input["propagate"]:
         piv.export_uncertainty(user_input)
-    # show_functions.show(before_height_file,
-    #                          output_base_name + 'vectors.json',
-    #                          output_base_name + 'covariances.json',
-    #                          1, 1)
+
+    # Show results    
+    if user_input["propagate"]:
+        show_functions.show(
+            user_input["before_file"],
+            vector_file=user_input["output_base_name"] + 'vectors.json',
+            covariance_file=user_input["output_base_name"] + 'covariances.json',
+        )
+    else:
+        show_functions.show(
+            user_input["before_file"],
+            vector_file=user_input["output_base_name"] + 'vectors.json'
+        )
 
 
 def estimate_bias(piv, user_input, image_data):
@@ -568,38 +576,38 @@ class Piv:
                 filtered_vectors.append([u_smooth[vt_count, hz_count],
                                          v_smooth[vt_count, hz_count]])
 
-        # # Status figure of before and after smoothing
-        # status_figure = plt.figure()
-        # u_axis = plt.subplot(2, 3, 1)
-        # v_axis = plt.subplot(2, 3, 2)
-        # u_axis.imshow(u_img)
-        # v_axis.imshow(v_img)
-        # before_axis = plt.subplot(2, 3, 3)
-        # piv_origins = np.asarray(self._piv_origins)
-        # piv_vectors = np.asarray(self._piv_vectors)
-        # before_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1], angles='xy', scale_units='xy')
-        # before_axis.axis('equal') 
-        # u_axis_smooth = plt.subplot(2, 3, 4)
-        # v_axis_smooth = plt.subplot(2, 3, 5)
-        # u_axis_smooth.imshow(u_smooth)
-        # v_axis_smooth.imshow(v_smooth)
-        # after_axis = plt.subplot(2, 3, 6)
-        # temp_piv_origins = []
-        # temp_piv_u = []
-        # temp_piv_v = []
-        # for vt_count in range(num_vt_comps):
-        #     for hz_count in range(num_hz_comps):
-        #         temp_piv_origins.append([hz_count*step_size + template_size,
-        #                                  vt_count*step_size + template_size])
-        #         row = vt_count
-        #         col = hz_count
-        #         temp_piv_u.append(u_smooth[row, col])
-        #         temp_piv_v.append(v_smooth[row, col])
-        # temp_piv_origins = np.asarray(temp_piv_origins)
-        # temp_piv_u = np.asarray(temp_piv_u)
-        # temp_piv_v = np.asarray(temp_piv_v)
-        # after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
-        # plt.show()
+        # Status figure of before and after smoothing
+        status_figure = plt.figure()
+        u_axis = plt.subplot(2, 3, 1)
+        v_axis = plt.subplot(2, 3, 2)
+        u_axis.imshow(u_img)
+        v_axis.imshow(v_img)
+        before_axis = plt.subplot(2, 3, 3)
+        piv_origins = np.asarray(self._piv_origins)
+        piv_vectors = np.asarray(self._piv_vectors)
+        before_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1], angles='xy', scale_units='xy')
+        before_axis.axis('equal') 
+        u_axis_smooth = plt.subplot(2, 3, 4)
+        v_axis_smooth = plt.subplot(2, 3, 5)
+        u_axis_smooth.imshow(u_smooth)
+        v_axis_smooth.imshow(v_smooth)
+        after_axis = plt.subplot(2, 3, 6)
+        temp_piv_origins = []
+        temp_piv_u = []
+        temp_piv_v = []
+        for vt_count in range(num_vt_comps):
+            for hz_count in range(num_hz_comps):
+                temp_piv_origins.append([hz_count*step_size + template_size,
+                                         vt_count*step_size + template_size])
+                row = vt_count
+                col = hz_count
+                temp_piv_u.append(u_smooth[row, col])
+                temp_piv_v.append(v_smooth[row, col])
+        temp_piv_origins = np.asarray(temp_piv_origins)
+        temp_piv_u = np.asarray(temp_piv_u)
+        temp_piv_v = np.asarray(temp_piv_v)
+        after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
+        plt.show()
 
         return filtered_origins, filtered_vectors
 
@@ -614,13 +622,13 @@ class Piv:
             piv_origins[:,0],
             piv_origins[:,1],
             temp_piv_u[:],
-            kind='cubic'
+            kind='linear'
         )
         v_interpolator = interpolate.interp2d(
             piv_origins[:,0],
             piv_origins[:,1],
             temp_piv_v[:],
-            kind='cubic'
+            kind='linear'
         )
         image_u_coords = np.arange(self._after.shape[1])
         image_v_coords = np.arange(self._after.shape[0])
@@ -629,23 +637,23 @@ class Piv:
         self._deformation_field_u_total += self._deformation_field_u
         self._deformation_field_v_total += self._deformation_field_v
 
-        # # status figure
-        # status_figure = plt.figure()
-        # axu = plt.subplot(1,2,1)
-        # axu.imshow(self._deformation_field_u_total)
-        # axv = plt.subplot(1,2,2)
-        # axv.imshow(self._deformation_field_v_total)
-        # plt.show()
+        # status figure
+        status_figure = plt.figure()
+        axu = plt.subplot(1,2,1)
+        axu.imshow(self._deformation_field_u_total)
+        axv = plt.subplot(1,2,2)
+        axv.imshow(self._deformation_field_v_total)
+        plt.show()
 
-        # status_figure = plt.figure()
-        # computed_axis = plt.subplot(1, 2, 1)
-        # interpolated_axis = plt.subplot(1, 2, 2)
-        # computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], temp_piv_u[:], temp_piv_v[:],angles='xy',scale_units='xy')
-        # computed_axis.axis('equal')
-        # image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
-        # interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
-        # interpolated_axis.axis('equal')
-        # plt.show()
+        status_figure = plt.figure()
+        computed_axis = plt.subplot(1, 2, 1)
+        interpolated_axis = plt.subplot(1, 2, 2)
+        computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], temp_piv_u[:], temp_piv_v[:],angles='xy',scale_units='xy')
+        computed_axis.axis('equal')
+        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
+        interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
+        interpolated_axis.axis('equal')
+        plt.show()
 
 
     def _deform_images(self, propagate):
@@ -654,10 +662,18 @@ class Piv:
             np.arange(self._after.shape[1]),
             np.arange(self._after.shape[0])
         )
-        u_coord = image_u_coords + self._deformation_field_u_total
-        v_coord = image_v_coords - self._deformation_field_v_total
+        # u_coord = image_u_coords + self._deformation_field_u_total
+        # v_coord = image_v_coords - self._deformation_field_v_total
+        u_coord = image_u_coords + self._deformation_field_u
+        v_coord = image_v_coords - self._deformation_field_v
+        # self._after_deformed = ndimage.map_coordinates(
+        #     self._after,
+        #     [v_coord.ravel(), u_coord.ravel()],
+        #     order=3,
+        #     mode='nearest'
+        # ).reshape(self._after.shape)
         self._after_deformed = ndimage.map_coordinates(
-            self._after,
+            self._after_deformed,
             [v_coord.ravel(), u_coord.ravel()],
             order=3,
             mode='nearest'
@@ -672,14 +688,14 @@ class Piv:
                 mode='nearest'
             ).reshape(self._after_uncertainty.shape)
 
-        # status_figure = plt.figure()
-        # original_axis = plt.subplot(1, 3, 1)
-        # deformed_axis = plt.subplot(1, 3, 3)
-        # before_axis = plt.subplot(1, 3, 2)
-        # original_axis.set_title('Original After')
-        # original_axis.imshow(self._after, cmap=plt.cm.gray)
-        # deformed_axis.set_title('Deformed After')
-        # deformed_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
-        # before_axis.set_title('Before')
-        # before_axis.imshow(self._before, cmap=plt.cm.gray)
-        # plt.show()
+        status_figure = plt.figure()
+        original_axis = plt.subplot(1, 3, 1)
+        deformed_axis = plt.subplot(1, 3, 3)
+        before_axis = plt.subplot(1, 3, 2)
+        original_axis.set_title('Original After')
+        original_axis.imshow(self._after, cmap=plt.cm.gray)
+        deformed_axis.set_title('Deformed After')
+        deformed_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
+        before_axis.set_title('Before')
+        before_axis.imshow(self._before, cmap=plt.cm.gray)
+        plt.show()

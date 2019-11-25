@@ -30,7 +30,7 @@ def piv(before, after, template_size, step_size, prop, outname):
                               template_size,step_size,
                               prop, outname)
 
-    # Ingest user supplied before and after GeoTIFF image data
+    # Ingest user supplied before and after images
     image_data = ingest_data(user_input)
 
     # Launch image correlation process
