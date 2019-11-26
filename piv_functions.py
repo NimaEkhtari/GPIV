@@ -96,13 +96,13 @@ def run_piv(user_input, image_data):
     piv = Piv(image_data)
 
     # Start with two PIV iterations with no uncertainty propagation
-    for i in range(2):
-        piv.correlate(user_input["template_size"],
-                      user_input["step_size"],
-                      False)
-        piv.deform(user_input["template_size"],
-                   user_input["step_size"],
-                   user_input["propagate"])                   
+    # for i in range(2):
+    #     piv.correlate(user_input["template_size"],
+    #                   user_input["step_size"],
+    #                   False)
+    #     piv.deform(user_input["template_size"],
+    #                user_input["step_size"],
+    #                user_input["propagate"])
     # For the third (final) iteration, propagate uncertainty if requested and
     # compute the final, cumulative vector displacements
     piv.correlate(user_input["template_size"],
@@ -563,8 +563,8 @@ class Piv:
             u_img[row,col] = self._piv_vectors[i][0]
             v_img[row,col] = -self._piv_vectors[i][1]
         # Smooth the u and v vector component images
-        u_smooth, s = robust_smooth_2d(u_img, robust=True, s=0.00005)
-        v_smooth, s = robust_smooth_2d(v_img, robust=True, s=0.00005)
+        u_smooth, s = robust_smooth_2d(u_img, robust=True) #s=0.00005
+        v_smooth, s = robust_smooth_2d(v_img, robust=True)
 
         # Transform origins and vectors back to a list format
         filtered_origins = []
@@ -613,47 +613,46 @@ class Piv:
 
 
     def _interpolate_vectors(self, filtered_origins, filtered_vectors):
-        # Cubic interpolation of grid of vectors for each pixel
+        # Cubic interpolation of vector components for each pixel. SciPy's
+        # interpolate.interp2d is deliberately not used (unreliable results).
         piv_origins = np.asarray(filtered_origins)
         piv_vectors = np.asarray(filtered_vectors)
-        temp_piv_u = piv_vectors[:,0]
-        temp_piv_v = piv_vectors[:,1]
-        u_interpolator = interpolate.interp2d(
-            piv_origins[:,0],
-            piv_origins[:,1],
-            temp_piv_u[:],
-            kind='linear'
-        )
-        v_interpolator = interpolate.interp2d(
-            piv_origins[:,0],
-            piv_origins[:,1],
-            temp_piv_v[:],
-            kind='linear'
-        )
-        image_u_coords = np.arange(self._after.shape[1])
-        image_v_coords = np.arange(self._after.shape[0])
-        self._deformation_field_u = u_interpolator(image_u_coords, image_v_coords)
-        self._deformation_field_v = v_interpolator(image_u_coords, image_v_coords)
+        u_vec = np.arange(self._after.shape[1])
+        v_vec = np.arange(self._after.shape[0])
+        u_grid, v_grid = np.meshgrid(u_vec, v_vec)
+        cubic_u = interpolate.griddata((piv_origins[:,0], piv_origins[:,1]), piv_vectors[:,0], (u_grid, v_grid), method="cubic")
+        cubic_v = interpolate.griddata((piv_origins[:,0], piv_origins[:,1]), piv_vectors[:,1], (u_grid, v_grid), method="cubic")        
+        # Fill missing interpolation data (on outsides) with nearest values
+        is_finite = np.isfinite(cubic_u)
+        nearest_u = interpolate.griddata((u_grid[is_finite], v_grid[is_finite]), cubic_u[is_finite], (u_grid, v_grid), method="nearest")
+        nearest_v = interpolate.griddata((u_grid[is_finite], v_grid[is_finite]), cubic_v[is_finite], (u_grid, v_grid), method="nearest")
+        cubic_u[~is_finite] = nearest_u[~is_finite]
+        cubic_v[~is_finite] = nearest_v[~is_finite]
+        # Save results
+        self._deformation_field_u = cubic_u
+        self._deformation_field_v = cubic_v
         self._deformation_field_u_total += self._deformation_field_u
         self._deformation_field_v_total += self._deformation_field_v
 
         # status figure
         status_figure = plt.figure()
-        axu = plt.subplot(1,2,1)
-        axu.imshow(self._deformation_field_u_total)
-        axv = plt.subplot(1,2,2)
-        axv.imshow(self._deformation_field_v_total)
+        axu = plt.subplot(1,3,1)
+        axu.imshow(self._deformation_field_u)
+        axv = plt.subplot(1,3,2)
+        axv.imshow(self._deformation_field_v)
+        axvt = plt.subplot(1,3,3)
+        axvt.imshow(self._deformation_field_v_total)
         plt.show()
-
-        status_figure = plt.figure()
-        computed_axis = plt.subplot(1, 2, 1)
-        interpolated_axis = plt.subplot(1, 2, 2)
-        computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], temp_piv_u[:], temp_piv_v[:],angles='xy',scale_units='xy')
-        computed_axis.axis('equal')
-        image_u_coords, image_v_coords = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
-        interpolated_axis.quiver(image_u_coords[::20,::20],-image_v_coords[::20,::20],self._deformation_field_u[::20,::20],self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
-        interpolated_axis.axis('equal')
-        plt.show()
+        # status figure
+        # status_figure = plt.figure()
+        # computed_axis = plt.subplot(1, 2, 1)
+        # interpolated_axis = plt.subplot(1, 2, 2)
+        # computed_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], piv_vectors[:,1],angles='xy',scale_units='xy')
+        # computed_axis.axis('equal')
+        # u_vec, v_vec = np.meshgrid(np.arange(self._after.shape[1]), np.arange(self._after.shape[0]))
+        # interpolated_axis.quiver(u_vec[::20,::20],-v_vec[::20,::20],self._deformation_field_u[::20,::20],self._deformation_field_v[::20,::20],angles='xy',scale_units='xy')
+        # interpolated_axis.axis('equal')
+        # plt.show()
 
 
     def _deform_images(self, propagate):
@@ -688,14 +687,14 @@ class Piv:
                 mode='nearest'
             ).reshape(self._after_uncertainty.shape)
 
-        status_figure = plt.figure()
-        original_axis = plt.subplot(1, 3, 1)
-        deformed_axis = plt.subplot(1, 3, 3)
-        before_axis = plt.subplot(1, 3, 2)
-        original_axis.set_title('Original After')
-        original_axis.imshow(self._after, cmap=plt.cm.gray)
-        deformed_axis.set_title('Deformed After')
-        deformed_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
-        before_axis.set_title('Before')
-        before_axis.imshow(self._before, cmap=plt.cm.gray)
-        plt.show()
+        # status_figure = plt.figure()
+        # original_axis = plt.subplot(1, 3, 1)
+        # deformed_axis = plt.subplot(1, 3, 3)
+        # before_axis = plt.subplot(1, 3, 2)
+        # original_axis.set_title('Original After')
+        # original_axis.imshow(self._after, cmap=plt.cm.gray)
+        # deformed_axis.set_title('Deformed After')
+        # deformed_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
+        # before_axis.set_title('Before')
+        # before_axis.imshow(self._before, cmap=plt.cm.gray)
+        # plt.show()
