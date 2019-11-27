@@ -49,7 +49,11 @@ def pivshow(background_image, vec, ell, vecscale, ellscale):
     
     Arguments: BACKGROUND_IMAGE  Background image in GeoTIFF format
     '''
-    show(background_image, vec, ell, vecscale, ellscale)
+    show(background_image,
+         vector_file=vec,
+         covariance_file=ell,
+         vector_scale=vecscale,
+         ellipse_scale=ellscale)
 
 
 cli.add_command(piv)

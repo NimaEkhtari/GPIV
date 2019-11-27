@@ -11,51 +11,29 @@ from matplotlib.patches import Ellipse
 from matplotlib.patches import Rectangle
 
 
-def show(image_file, **kwargs):
-    # Get background image
+def show(image_file, vector_file="", covariance_file="",
+         vector_scale=1, ellipse_scale=1):
+    # Clean input
+    if vector_scale is None:
+        vector_scale = 1
+    if ellipse_scale is None:
+        ellipse_scale = 1
+    
+    # Get background image and plot
     (image, geo_extents, geo_transform) = get_image_array(image_file)
-
-    # Get origins and vectors
-    if "vectors" in kwargs:
-        origins_vectors = kwargs.get("vectors")
-    elif "vector_file" in kwargs:
-        vector_file = kwargs.get("vector_file")
-        with open(vector_file) as json_file:
-            origins_vectors = json.load(json_file)
-    else:
-        print("Vector data missing. Unable to plot vectors.")
-        sys.exit()
-
-    # Get covariance vector endpoints and ellipse data
-    if "covariances" in kwargs:
-        endpoints_covariances = kwargs.get("covariances")
-    elif "covariance_file" in kwargs:
-        covariance_file = kwargs.get("covariance_file")
-        with open(covariance_file) as json_file:
-            endpoints_covariances = json.load(json_file)
-    else:
-        endpoints_covariances = False
-
-    # Get vector and ellipse scale factors
-    if "vector_scale_factor" in kwargs:
-        vector_scale_factor = kwargs.get("vector_scale_factor")
-    else:
-        vector_scale_factor = 1
-
-    if "ellipse_scale_factor" in kwargs:
-        ellipse_scale_factor = kwargs.get("ellipse_scale_factor")
-    else:
-        ellipse_scale_factor = 1
-
-    # Generate grayscale background image
     figure, axes = plot_image(image, geo_extents)
 
-    # Overlay PIV vectors and uncertainty ellipses
-    plot_vectors(axes, geo_extents,
-                 origins_vectors, vector_scale_factor)
-    if endpoints_covariances:
+    # Overlay PIV vectors and uncertainty ellipses if requested
+    if vector_file:
+        with open(vector_file) as json_file:
+            origins_vectors = json.load(json_file)
+        plot_vectors(axes, geo_extents,
+                     origins_vectors, vector_scale)
+    if covariance_file:
+        with open(covariance_file) as json_file:
+            endpoints_covariances = json.load(json_file)
         plot_ellipses(axes, geo_extents,
-                      endpoints_covariances, ellipse_scale_factor)
+                      endpoints_covariances, ellipse_scale)
 
     plt.show()
 

@@ -14,12 +14,8 @@ import show_functions
 from robust_smooth_2d import robust_smooth_2d
 
 
-def format_input(before,
-                 after,
-                 template_size,
-                 step_size,
-                 prop,
-                 outname):
+def format_input(before, after, template_size,
+                 step_size, prop, outname):
 
     user_input = dict(before_file=before,
                       after_file=after,
@@ -52,11 +48,13 @@ def ingest_data(user_input):
                       after_uncertainty=[],
                       geo_transform=[])
 
+    # Import raster data. Conversion to float64 is critical for correct 
+    # uncertainty propagation results.
     source = rasterio.open(user_input["before_file"])
-    image_data["before"] = source.read(1)
+    image_data["before"] = source.read(1).astype(np.float64)
     before_geo_transform = np.reshape(np.asarray(source.transform), (3,3))
     source = rasterio.open(user_input["after_file"])
-    image_data["after"] = source.read(1)
+    image_data["after"] = source.read(1).astype(np.float64)
     after_geo_transform = np.reshape(np.asarray(source.transform), (3,3))
 
     # PIV results are misleading if the before and after data is not on the 
@@ -95,8 +93,9 @@ def run_piv(user_input, image_data):
     """
     piv = Piv(image_data)
 
-    # Start with two PIV iterations with no uncertainty propagation
+    # # Start with two PIV iterations with no uncertainty propagation
     # for i in range(2):
+    #     print("Computing correlation pass #{}".format(i))
     #     piv.correlate(user_input["template_size"],
     #                   user_input["step_size"],
     #                   False)
@@ -105,6 +104,7 @@ def run_piv(user_input, image_data):
     #                user_input["propagate"])
     # For the third (final) iteration, propagate uncertainty if requested and
     # compute the final, cumulative vector displacements
+    print("Computing correlation pass #3")
     piv.correlate(user_input["template_size"],
                   user_input["step_size"],
                   user_input["propagate"])
@@ -112,12 +112,13 @@ def run_piv(user_input, image_data):
 
     # Estimate and add bias variance if propagating uncertainty
     if user_input["propagate"]:
+        print("Computing static uncertainty")
         estimate_bias(piv, user_input, image_data)
 
     # All done. Export the PIV vectors and uncertainties to JSON files
     piv.export(user_input, image_data)
     if user_input["propagate"]:
-        piv.export_uncertainty(user_input)
+        piv.export_uncertainty(user_input, image_data)
 
     # Show results    
     if user_input["propagate"]:
@@ -272,6 +273,7 @@ class Piv:
         piv_origins[:,0] += image_data["geo_transform"][0,2]  # Offset by leftmost pixel to get ground coordinate
         piv_origins[:,1] = image_data["geo_transform"][1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate    
         piv_vectors = np.asarray(self._piv_vectors)
+        piv_vectors[:,1] *= -1  # convert from dV (positive down) to dY (positive up)
         piv_vectors *= image_data["geo_transform"][0,0]  # Scale by pixel ground size
         
         origins_vectors = np.concatenate((piv_origins, piv_vectors), axis=1)
@@ -279,29 +281,33 @@ class Piv:
         print("PIV displacement vectors saved to file '{}vectors.json'".format(user_input["output_base_name"]))
 
 
-    def export_uncertainty(input_data, image_data):
+    def export_uncertainty(self, user_input, image_data):
         # Convert from pixels to ground distance
-        piv_origins = np.asarray(piv_origins)        
-        piv_origins *= geo_transform[0,0]  # Scale by pixel ground size
-        piv_origins[:,0] += geo_transform[0,2]  # Offset by leftmost pixel to get ground coordinate
-        piv_origins[:,1] = geo_transform[1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate
-        piv_vectors = np.asarray(piv_vectors)
-        piv_vectors *= geo_transform[0,0]  # Scale by pixel ground size
-        peak_covariance = np.asarray(peak_covariance)
-        peak_covariance *= geo_transform[0,0]**2  # Scale by squared pixel ground size
+        piv_origins = np.asarray(self._piv_origins, dtype=np.float64)
+        piv_origins *= image_data["geo_transform"][0,0]  # Scale by pixel ground size
+        piv_origins[:,0] += image_data["geo_transform"][0,2]  # Offset by leftmost pixel to get ground coordinate
+        piv_origins[:,1] = image_data["geo_transform"][1,2] - piv_origins[:,1]  # Subtract from uppermost pixel to get ground coordinate
+        piv_vectors = np.asarray(self._piv_vectors)
+        piv_vectors[:,1] *= -1  # convert from dV (positive down) to dY (positive up)
+        piv_vectors *= image_data["geo_transform"][0,0]  # Scale by pixel ground size
+        peak_covariance = np.asarray(self._peak_covariance)
+        for cov in peak_covariance: # convert from dV (positive down) to dY (positive up)
+            cov[0][1] *= -1
+            cov[1][0] *= -1
+        peak_covariance *= image_data["geo_transform"][0,0]**2  # Scale by squared pixel ground size
 
         piv_end_location = piv_origins
-        piv_end_location[:,0] += piv_vectors[:,0]     
-        piv_end_location[:,1] -= piv_vectors[:,1]  # Subtract to convert from dV (positive down) to dY (positive up)
+        piv_end_location[:,0] += piv_vectors[:,0]
+        piv_end_location[:,1] += piv_vectors[:,1]
 
         piv_end_location = piv_end_location.tolist()
         peak_covariance = peak_covariance.tolist()
         locations_covariances = []
-        for i in range(len(piv_end_location)):
-            locations_covariances.append([piv_end_location[i], peak_covariance[i]])
+        for (loc, cov) in zip(piv_end_location, peak_covariance):
+            locations_covariances.append([loc, cov])
 
-        json.dump(locations_covariances, open(output_base_name + "covariances.json", "w"))
-        print("PIV covariance matrices saved to file '{}covariances.json'".format(output_base_name))
+        json.dump(locations_covariances, open(user_input["output_base_name"] + "covariances.json", "w"))
+        print("PIV covariance matrices saved to file '{}covariances.json'".format(user_input["output_base_name"]))
 
 
     def _get_windows(self, template_size, step_size, propagate):
@@ -561,7 +567,7 @@ class Piv:
             row = int((self._piv_origins[i][1] - template_size)/step_size)
             col = int((self._piv_origins[i][0] - template_size)/step_size)
             u_img[row,col] = self._piv_vectors[i][0]
-            v_img[row,col] = -self._piv_vectors[i][1]
+            v_img[row,col] = self._piv_vectors[i][1]
         # Smooth the u and v vector component images
         u_smooth, s = robust_smooth_2d(u_img, robust=True) #s=0.00005
         v_smooth, s = robust_smooth_2d(v_img, robust=True)
@@ -585,7 +591,8 @@ class Piv:
         before_axis = plt.subplot(2, 3, 3)
         piv_origins = np.asarray(self._piv_origins)
         piv_vectors = np.asarray(self._piv_vectors)
-        before_axis.quiver(piv_origins[:,0], -piv_origins[:,1], piv_vectors[:,0], -piv_vectors[:,1], angles='xy', scale_units='xy')
+        before_axis.quiver(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0], piv_vectors[:,1], angles='xy', scale_units='xy')
+        before_axis.invert_yaxis()
         before_axis.axis('equal') 
         u_axis_smooth = plt.subplot(2, 3, 4)
         v_axis_smooth = plt.subplot(2, 3, 5)
@@ -606,7 +613,9 @@ class Piv:
         temp_piv_origins = np.asarray(temp_piv_origins)
         temp_piv_u = np.asarray(temp_piv_u)
         temp_piv_v = np.asarray(temp_piv_v)
-        after_axis.quiver(temp_piv_origins[:,0], -temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
+        after_axis.quiver(temp_piv_origins[:,0], temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
+        after_axis.invert_yaxis()
+        after_axis.axis('equal') 
         plt.show()
 
         return filtered_origins, filtered_vectors
@@ -664,7 +673,7 @@ class Piv:
         # u_coord = image_u_coords + self._deformation_field_u_total
         # v_coord = image_v_coords - self._deformation_field_v_total
         u_coord = image_u_coords + self._deformation_field_u
-        v_coord = image_v_coords - self._deformation_field_v
+        v_coord = image_v_coords + self._deformation_field_v
         # self._after_deformed = ndimage.map_coordinates(
         #     self._after,
         #     [v_coord.ravel(), u_coord.ravel()],
