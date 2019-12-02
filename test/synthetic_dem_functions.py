@@ -12,14 +12,6 @@ def create_dem(dem_size, num_gsn, gsn_max, seed, **kwargs):
     # Set random seed
     np.random.seed(seed)
 
-    # Uniform random distributions of the gaussian magnitudes and widths
-    mag = -gsn_max + 2*gsn_max*np.random.rand(num_gsn, 1)
-    wid = mag
-
-    # Uniform random distribution of the gaussian locations
-    x_gsn = -half_data_size + 2*half_data_size*np.random.rand(num_gsn, 1)
-    y_gsn = -half_data_size + 2*half_data_size*np.random.rand(num_gsn, 1)
-
     # X, Y coords of synthetic DEM
     half_dem_size = (np.floor(dem_size/2))
     x_vec = np.arange(-half_dem_size, half_dem_size+1, 1)
@@ -34,6 +26,12 @@ def create_dem(dem_size, num_gsn, gsn_max, seed, **kwargs):
         Y -= dY
 
     # Create DEM surface elevations from random gaussians
+    # Uniform random distributions of the gaussian magnitudes and widths
+    mag = -gsn_max + 2*gsn_max*np.random.rand(num_gsn, 1)
+    wid = mag
+    # Uniform random distribution of the gaussian locations
+    x_gsn = -half_data_size + 2*half_data_size*np.random.rand(num_gsn, 1)
+    y_gsn = -half_data_size + 2*half_data_size*np.random.rand(num_gsn, 1)
     Z = np.zeros(X.shape)
     for i in range(num_gsn):
         Z += mag[i]*np.exp(-((((X-x_gsn[i])**2) / (2*wid[i]**2))
@@ -95,11 +93,11 @@ def get_deformation(X, Y, deform_params):
     dY = dX.copy()
 
     # Shear
-    shear_matrix = np.array([[0, sx], [sy, 0]])
+    shear_matrix = np.array([[1, sx], [sy, 1]])
     XY = np.vstack((X.reshape(1, -1), Y.reshape(1, -1)))
     dXdY = np.matmul(shear_matrix, XY)
-    dX += np.reshape(dXdY[0,:], X.shape)
-    dY += np.reshape(dXdY[1,:], Y.shape)
+    dX = np.reshape(dXdY[0,:], X.shape) - X
+    dY = np.reshape(dXdY[1,:], Y.shape) - Y
     # Translation
     dX += tx
     dY += ty

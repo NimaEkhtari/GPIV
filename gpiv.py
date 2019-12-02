@@ -13,10 +13,10 @@ def cli():
 @click.argument('after', type=click.Path(exists=True, readable=True))
 @click.argument('template_size', type=click.IntRange(3, None))
 @click.argument('step_size', type=click.IntRange(1, None))
-@click.option('--iter', type=click.IntRange(1, None), default=3, help='Option to set number of correlation passes. Default value is 3.')
-@click.option('--prop', nargs=2, type=click.Path(exists=True, readable=True), help='Option to propagate error. Requires two arguments: 1) pre-event uncertainties in GeoTIFF format, 2) post-event uncertainties in GeoTIFF format.')
+@click.option('--iternum', type=click.IntRange(1, None), default=3, help='Option to set number of correlation passes. Default value is 3.')
 @click.option('--outname', type=str, help='Optional base filename to use for output files.')
-def piv(before, after, template_size, step_size, prop, outname):
+@click.option('--propagate', nargs=2, type=click.Path(exists=True, readable=True), help='Option to propagate error. Requires two arguments: 1) pre-event uncertainties in GeoTIFF format, 2) post-event uncertainties in GeoTIFF format.')
+def piv(before, after, template_size, step_size, iternum, outname, propagate):
     '''
     Runs PIV on a pair pre- and post-event DEMs.
 
@@ -28,8 +28,8 @@ def piv(before, after, template_size, step_size, prop, outname):
     '''
     # Format user input
     user_input = format_input(before, after,
-                              template_size,step_size,
-                              iter, prop, outname)
+                              template_size, step_size,
+                              iternum, outname, propagate)
 
     # Ingest user supplied before and after images
     image_data = ingest_data(user_input)

@@ -15,7 +15,7 @@ from robust_smooth_2d import robust_smooth_2d
 
 
 def format_input(before, after, template_size,
-                 step_size, iter, prop, outname):
+                 step_size, iternum, outname, propagate):
 
     user_input = dict(before_file=before,
                       after_file=after,
@@ -23,14 +23,14 @@ def format_input(before, after, template_size,
                       after_uncertainty_file="",
                       template_size=template_size,
                       step_size=step_size,
-                      num_iterations=iter,
+                      num_iterations=iternum,
                       propagate=False,
                       output_base_name="")
 
-    if prop:
+    if propagate:
         user_input["propagate"] = True
-        user_input["before_uncertainty_file"] = prop[0]
-        user_input["after_uncertainty_file"] = prop[1]
+        user_input["before_uncertainty_file"] = propagate[0]
+        user_input["after_uncertainty_file"] = propagate[1]
 
     if outname:
         user_input["output_base_name"] = outname + "_"
@@ -50,7 +50,7 @@ def ingest_data(user_input):
                       geo_transform=[])
 
     # Import raster data. Conversion to float64 is critical for correct 
-    # uncertainty propagation results.
+    # uncertainty propagation.
     source = rasterio.open(user_input["before_file"])
     image_data["before"] = source.read(1).astype(np.float64)
     before_geo_transform = np.reshape(np.asarray(source.transform), (3,3))
@@ -59,14 +59,16 @@ def ingest_data(user_input):
     after_geo_transform = np.reshape(np.asarray(source.transform), (3,3))
 
     # PIV results are misleading if the before and after data is not on the 
-    # same datum and of equal spatial extent
-    if not np.array_equal(before_geo_transform, after_geo_transform):
+    # same datum and of equal spatial extent. A closeness tolerance is used 
+    # here to avoid detection of small rounding errors.
+    if not np.allclose(before_geo_transform,
+                       after_geo_transform,
+                       rtol=0.000001):
         print("The spatial extent and/or datum of the 'before' and 'after' ",
               "data is not equivalent.")
         sys.exit()
     else:
         image_data["geo_transform"] = before_geo_transform
-
     if user_input["propagate"]:
         image_data["before_uncertainty"] = rasterio.open(
             user_input["before_uncertainty_file"]).read(1)
@@ -84,19 +86,20 @@ def run_piv(user_input, image_data):
     We use an object to store the current and cumulative PIV vectors during the
     iterative process. Three iterations should be sufficient to remove shear.
     The 'after' data is not deformed on the final iteration, since the current
-    deformation algorithm smooths the PIV vectors (we do not want the final 
-    result smoothed).
+    deformation algorithm smooths the PIV vectors and we do not want the final 
+    result smoothed.
 
-    If uncertainty is being propagated, we need to estimate the bias variance
-    and add it to the propagated variances. The bias variance is the spatial
-    variance in the PIV vector components that is present when PIV is run on
-    two identical images.
+    If uncertainty is being propagated, we need to estimate the variance
+    that exists when no motion is present (i.e., the variance imparted by the
+    imperfections of the algorithm itself) and add this "static" variance to the
+    propagated variances. The static variance is estimated from the variance in
+    the PIV vector components present when PIV is run on two identical images.
     """
     piv = Piv(image_data)
 
     # correlate and deform
     for i in range(user_input["num_iterations"] - 1):
-        print("Computing correlation pass #{}".format(i))
+        print("Computing correlation pass #{}".format(i+1))
         piv.correlate(user_input["template_size"],
                       user_input["step_size"],
                       False)
@@ -120,7 +123,7 @@ def run_piv(user_input, image_data):
     # Estimate and add static variance if propagating uncertainty
     if user_input["propagate"]:
         print("Computing static variance")
-        estimate_bias(piv, user_input, image_data)
+        estimate_static_variance(piv, user_input, image_data)
 
     # All done. Export the PIV vectors and uncertainties to JSON files
     piv.export(user_input, image_data)
@@ -141,16 +144,16 @@ def run_piv(user_input, image_data):
         )
 
 
-def estimate_bias(piv, user_input, image_data):
+def estimate_static_variance(piv, user_input, image_data):
     temp = image_data["after"]
     image_data["after"] = image_data["before"]
-    piv_bias = Piv(image_data)
-    piv_bias.correlate(user_input["template_size"],
+    piv_static = Piv(image_data)
+    piv_static.correlate(user_input["template_size"],
                        user_input["step_size"],
                        False)
     image_data["after"] = temp
-    u_bias_variance, v_bias_variance = piv_bias.compute_bias()
-    piv.add_bias(u_bias_variance, v_bias_variance)
+    u_variance, v_variance = piv_static.compute_static_variance()
+    piv.add_static_variance(u_variance, v_variance)
 
 
 class Piv:
@@ -260,14 +263,14 @@ class Piv:
         # plt.show()
 
 
-    def compute_bias(self):
+    def compute_static_variance(self):
         piv_vectors = np.asarray(self._piv_vectors)
         u_bias_variance = np.var(piv_vectors[:,0])
         v_bias_variance = np.var(piv_vectors[:,1])
         return [u_bias_variance, v_bias_variance]
 
 
-    def add_bias(self, u_bias_variance, v_bias_variance):
+    def add_static_variance(self, u_bias_variance, v_bias_variance):
         for covariance in self._peak_covariance:
             covariance[0][0] += u_bias_variance
             covariance[1][1] += v_bias_variance
