@@ -15,7 +15,7 @@ from robust_smooth_2d import robust_smooth_2d
 
 
 def format_input(before, after, template_size,
-                 step_size, prop, outname):
+                 step_size, iter, prop, outname):
 
     user_input = dict(before_file=before,
                       after_file=after,
@@ -23,6 +23,7 @@ def format_input(before, after, template_size,
                       after_uncertainty_file="",
                       template_size=template_size,
                       step_size=step_size,
+                      num_iterations=iter,
                       propagate=False,
                       output_base_name="")
 
@@ -77,8 +78,8 @@ def ingest_data(user_input):
 
 def run_piv(user_input, image_data):
     """
-    An iterative PIV approach is used to handle the presence of shear, or 
-    gradient, in the movement between the before and after data. During each 
+    An iterative PIV approach is used to handle the presence of velocity shear
+    (gradient) in the movement between the before and after data. During each 
     iteration, the computed PIV vectors are used to deform the 'after' data.
     We use an object to store the current and cumulative PIV vectors during the
     iterative process. Three iterations should be sufficient to remove shear.
@@ -93,26 +94,32 @@ def run_piv(user_input, image_data):
     """
     piv = Piv(image_data)
 
-    # # Start with two PIV iterations with no uncertainty propagation
-    # for i in range(2):
-    #     print("Computing correlation pass #{}".format(i))
-    #     piv.correlate(user_input["template_size"],
-    #                   user_input["step_size"],
-    #                   False)
-    #     piv.deform(user_input["template_size"],
-    #                user_input["step_size"],
-    #                user_input["propagate"])
-    # For the third (final) iteration, propagate uncertainty if requested and
+    # correlate and deform
+    for i in range(user_input["num_iterations"] - 1):
+        print("Computing correlation pass #{}".format(i))
+        piv.correlate(user_input["template_size"],
+                      user_input["step_size"],
+                      False)
+        piv.deform(user_input["template_size"],
+                   user_input["step_size"],
+                   user_input["propagate"])
+    # In final (or only) iteration, propagate uncertainty if requested and
     # compute the final, cumulative vector displacements
-    print("Computing correlation pass #3")
+    if user_input["propagate"]:
+        print("Computing correlation pass #{} and propagating uncertainty" \
+              .format(user_input["num_iterations"]))
+    else:
+        print("Computing correlation pass #{}".format(
+              user_input["num_iterations"]))
+
     piv.correlate(user_input["template_size"],
                   user_input["step_size"],
                   user_input["propagate"])
     piv.compute_total()
 
-    # Estimate and add bias variance if propagating uncertainty
+    # Estimate and add static variance if propagating uncertainty
     if user_input["propagate"]:
-        print("Computing static uncertainty")
+        print("Computing static variance")
         estimate_bias(piv, user_input, image_data)
 
     # All done. Export the PIV vectors and uncertainties to JSON files

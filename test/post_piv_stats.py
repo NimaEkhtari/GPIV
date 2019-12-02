@@ -6,6 +6,7 @@ from synthetic_dem_functions import create_dem, get_deformation, export_geotiff
 
 
 def compare_to_known(vector_file, params):
+    # Difference between solved displacement and known displacement
     with open(vector_file) as json_file:
         origins_vectors = json.load(json_file)
     origins_vectors = np.asarray(origins_vectors)
