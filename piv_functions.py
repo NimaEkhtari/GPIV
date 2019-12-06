@@ -181,7 +181,7 @@ class Piv:
         self._piv_vectors = []
 
         # Progress display prep
-        status_figure = plt.figure()
+        status_figure = plt.figure(figsize=(10, 5))
         before_axis = plt.subplot(1, 2, 1)
         after_axis = plt.subplot(1, 2, 2)
 
@@ -197,6 +197,18 @@ class Piv:
 
             # Compute normalized cross-correlation (NCC)
             ncc = match_template(record[4], record[3])
+
+            # print(np.amax(ncc))
+            # from mpl_toolkits.mplot3d import Axes3D
+            # from matplotlib import cm
+            # fig = plt.figure()
+            # ax = fig.gca(projection='3d')
+            # X = np.arange(0, ncc.shape[0])
+            # Y = np.arange(0, ncc.shape[1])
+            # X, Y = np.meshgrid(X, Y)
+            # ax.plot_surface(X, Y, ncc, cmap=cm.coolwarm)
+            # plt.show()
+
             max_idx = np.squeeze(np.asarray(np.where(ncc == np.max(ncc))))
 
             # Check for peak location on edges of NCC matrix - this breaks
@@ -301,9 +313,9 @@ class Piv:
         piv_vectors[:,1] *= -1  # convert from dV (positive down) to dY (positive up)
         piv_vectors *= image_data["geo_transform"][0,0]  # Scale by pixel ground size
         peak_covariance = np.asarray(self._peak_covariance)
-        for cov in peak_covariance: # convert from dV (positive down) to dY (positive up)
-            cov[0][1] *= -1
-            cov[1][0] *= -1
+        # for cov in peak_covariance: # convert from dV (positive down) to dY (positive up)
+        #     cov[0][1] *= -1
+        #     cov[1][0] *= -1
         peak_covariance *= image_data["geo_transform"][0,0]**2  # Scale by squared pixel ground size
 
         piv_end_location = piv_origins
@@ -392,8 +404,21 @@ class Piv:
                            template_size, search_size):
         plt.sca(before_axis)
         plt.cla()
+
+        # image_data_min = min(np.percentile(self._before_uncertainty, 1),
+        #                  np.percentile(self._before_uncertainty, 1))
+        # image_data_max = max(np.percentile(self._before_uncertainty, 99),
+        #                     np.percentile(self._before_uncertainty, 99))
+        image_data_min = min(np.percentile(self._before, 1),
+                         np.percentile(self._before, 1))
+        image_data_max = max(np.percentile(self._before, 99),
+                            np.percentile(self._before, 99))
+
         before_axis.set_title('Before')
-        before_axis.imshow(self._before, cmap=plt.cm.gray)
+        before_axis.imshow(self._before,
+                           vmin=image_data_min,
+                           vmax=image_data_max,
+                           cmap=plt.cm.gray)
         before_axis.add_patch(matplotlib.patches.Rectangle(
             (hz_template_start, vt_template_start), 
             template_size-1, 
@@ -404,8 +429,21 @@ class Piv:
         
         plt.sca(after_axis)
         plt.cla()
+
+        # image_data_min = min(np.percentile(self._after_uncertainty_deformed, 1),
+        #                  np.percentile(self._after_uncertainty_deformed, 1))
+        # image_data_max = max(np.percentile(self._after_uncertainty_deformed, 99),
+        #                     np.percentile(self._after_uncertainty_deformed, 99))
+        image_data_min = min(np.percentile(self._after_deformed, 1),
+                         np.percentile(self._after_deformed, 1))
+        image_data_max = max(np.percentile(self._after_deformed, 99),
+                            np.percentile(self._after_deformed, 99))
+
         after_axis.set_title('After')
-        after_axis.imshow(self._after_deformed, cmap=plt.cm.gray)
+        after_axis.imshow(self._after_deformed,
+                          vmin=image_data_min,
+                          vmax=image_data_max,
+                          cmap=plt.cm.gray)
         after_axis.add_patch(matplotlib.patches.Rectangle(
             (hz_search_start,vt_search_start), 
             search_size-1, 
@@ -414,7 +452,23 @@ class Piv:
             edgecolor='r',
             fill=None))
 
+        # from matplotlib.patches import FancyArrow
+        # import os
+        # for (o, v) in zip(self._piv_origins, self._piv_vectors):
+        #     arrow = FancyArrow(
+        #         o[0], o[1],
+        #         v[0], v[1]*3,
+        #         length_includes_head=True,
+        #         head_width=7,
+        #         overhang=0.8,
+        #         fc='yellow',
+        #         ec='yellow'
+        #     )
+        #     before_axis.add_artist(arrow)
+
         plt.pause(0.1)
+        # if len(self._piv_vectors) == 0:
+        #     plt.pause(10)
 
 
     def _subpixel_peak(self, ncc, max_idx):

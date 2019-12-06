@@ -27,17 +27,18 @@ def vector_residuals(vector_file, deform_params):
     std_Y = statistics.stdev(res_Y)
     print("std X = {}".format(std_X))
     print("std Y = {}".format(std_Y))
+    print(len(X))
 
-    # fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
-    # axs[0].hist(res_X, bins=np.arange(-0.4, 0.425, 0.025))
-    # axs[0].set_title('X std = {}'.format(std_X))
-    # axs[0].set_xlim(-0.4, 0.4)
-    # axs[0].set_ylim(0, 150)
-    # axs[1].hist(res_Y, bins=np.arange(-.4, 0.425, 0.025))
-    # axs[1].set_title('Y std = {}'.format(std_Y))
-    # axs[1].set_xlim(-0.4, 0.4)
-    # axs[1].set_ylim(0, 150)
-    # plt.show()
+    fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True, figsize=(5, 3.5))
+    axs[0].hist(res_X, bins=np.arange(-0.2, 0.2, 0.01))
+    axs[0].set_title('X Component')
+    axs[0].set_xlim(-0.2, 0.2)
+    axs[0].set_ylim(0, 80)
+    axs[1].hist(res_Y, bins=np.arange(-0.2, 0.2, 0.01))
+    axs[1].set_title('Y Component')
+    axs[1].set_xlim(-0.2, 0.2)
+    axs[1].set_ylim(0, 80)
+    plt.show()
 
     return res_X, res_Y
 
@@ -86,13 +87,13 @@ def compare(res_X, res_Y, std_X, std_Y, semimajor):
 
 
 
-vector_file = "tripleShear0p05_vectors.json"
-covariance_file = "tripleShear0p05_covariances.json"
+vector_file = "test2_vectors.json"
+covariance_file = "test2_covariances.json"
 deform_params = {
         'tx': 0,
         'ty': 0,
         'sx': 0,
-        'sy': 0.05,
+        'sy': 0.0,
         'g_maj': 30,
         'g_min': 30,
         'g_amp': 0,

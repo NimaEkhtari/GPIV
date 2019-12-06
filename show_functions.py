@@ -12,7 +12,7 @@ from matplotlib.patches import Rectangle
 
 
 def show(image_file, vector_file="", covariance_file="",
-         vector_scale=1, ellipse_scale=1):
+         vector_scale=1, ellipse_scale=1, title=""):
     # Clean input
     if vector_scale is None:
         vector_scale = 1
@@ -21,7 +21,7 @@ def show(image_file, vector_file="", covariance_file="",
     
     # Get background image and plot
     (image, geo_extents, geo_transform) = get_image_array(image_file)
-    figure, axes = plot_image(image, geo_extents)
+    figure, axes = plot_image(image, geo_extents, title)
 
     # Overlay PIV vectors and uncertainty ellipses if requested
     if vector_file:
@@ -48,7 +48,7 @@ def get_image_array(image_file):
     return image_array, geo_extents, geo_transform
 
 
-def plot_image(image_array, geo_extents):
+def plot_image(image_array, geo_extents, title):
     figure = plt.figure(figsize=(6,6))
     axes = plt.gca()
     image_data_min = min(np.percentile(image_array, 1),
@@ -60,6 +60,7 @@ def plot_image(image_array, geo_extents):
                extent=geo_extents,
                vmin=image_data_min,
                vmax=image_data_max)
+    axes.set_title(title)
     return figure, axes
 
 

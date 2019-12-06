@@ -10,7 +10,7 @@ deform_params = {
     'tx': 0,
     'ty': 0,
     'sx': 0,
-    'sy': 0.05,
+    'sy': 0.0,
     'g_maj': 30,
     'g_min': 30,
     'g_amp': 0,
@@ -18,7 +18,7 @@ deform_params = {
 }
 noise_std = 0.1
 X, Y, Z, N = create_dem(250, 5000, 5, 6, deform=deform_params, noise=noise_std)
-filename = 'shear0p05'
+filename = 'base2'
 
 # Export DEM and uncertainty array to GeoTIFF
 export_geotiff(X, Y, Z, filename + '.tif')

@@ -44,7 +44,7 @@ def create_dem(dem_size, num_gsn, gsn_max, seed, **kwargs):
 
     # Add noise to DEM surface
     if 'noise' in kwargs:
-        np.random.seed(0)
+        np.random.seed(1)
         noise_std = kwargs.get('noise')
         N = noise_std*np.random.randn(Z.shape[0], Z.shape[1])
         Z += N
