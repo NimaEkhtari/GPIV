@@ -1,7 +1,6 @@
-import statistics
 import json
 import numpy as np
-import matplotlib.pyplot as  plt
+import matplotlib.pyplot as plt
 from synthetic_dem_functions import create_dem, get_deformation, export_geotiff
 
 
@@ -23,8 +22,12 @@ def vector_residuals(vector_file, deform_params):
     res_Y = vector_Y - dY
     
     # Show some data
-    std_X = statistics.stdev(res_X)
-    std_Y = statistics.stdev(res_Y)
+    # mean_X = np.mean(res_X)
+    # mean_Y = np.mean(res_Y)
+    std_X = np.std(res_X)
+    std_Y = np.std(res_Y)
+    # print("mean X = {}".format(mean_X))
+    # print("mean Y = {}".format(mean_Y))
     print("std X = {}".format(std_X))
     print("std Y = {}".format(std_Y))
     print(len(X))
@@ -87,11 +90,11 @@ def compare(res_X, res_Y, std_X, std_Y, semimajor):
 
 
 
-vector_file = "test2_vectors.json"
-covariance_file = "test2_covariances.json"
+vector_file = "trans1p7_3iter_vectors.json"
+covariance_file = "trans1p7_3iter_covariances.json"
 deform_params = {
-        'tx': 0,
-        'ty': 0,
+        'tx': 1.7,
+        'ty': 1.7,
         'sx': 0,
         'sy': 0.0,
         'g_maj': 30,

@@ -181,33 +181,35 @@ class Piv:
         self._piv_vectors = []
 
         # Progress display prep
-        status_figure = plt.figure(figsize=(10, 5))
-        before_axis = plt.subplot(1, 2, 1)
-        after_axis = plt.subplot(1, 2, 2)
+        # status_figure = plt.figure(figsize=(10, 5))
+        # before_axis = plt.subplot(1, 2, 1)
+        # after_axis = plt.subplot(1, 2, 2)
 
         # Pre-extract all the required window data
         window_data = self._get_windows(template_size, step_size, propagate)
 
         for record in window_data:
             # Display progress
-            self._show_piv_location(before_axis, after_axis,
-                                    record[1][0], record[1][1],
-                                    record[2][0], record[2][1],
-                                    template_size, template_size*2)
+            # self._show_piv_location(before_axis, after_axis,
+            #                         record[1][0], record[1][1],
+            #                         record[2][0], record[2][1],
+            #                         template_size, template_size*2)
 
             # Compute normalized cross-correlation (NCC)
             ncc = match_template(record[4], record[3])
 
-            # print(np.amax(ncc))
-            # from mpl_toolkits.mplot3d import Axes3D
-            # from matplotlib import cm
-            # fig = plt.figure()
-            # ax = fig.gca(projection='3d')
-            # X = np.arange(0, ncc.shape[0])
-            # Y = np.arange(0, ncc.shape[1])
-            # X, Y = np.meshgrid(X, Y)
-            # ax.plot_surface(X, Y, ncc, cmap=cm.coolwarm)
-            # plt.show()
+            # if propagate:
+            #     print(np.amax(ncc))
+            #     from mpl_toolkits.mplot3d import Axes3D
+            #     from matplotlib import cm
+            #     fig = plt.figure()
+            #     ax = fig.gca(projection='3d')
+            #     X = np.arange(0, ncc.shape[0])
+            #     Y = np.arange(0, ncc.shape[1])
+            #     X, Y = np.meshgrid(X, Y)
+            #     ax.plot_surface(X, Y, ncc, cmap=cm.coolwarm)
+            #     ax.set_proj_type('ortho')
+            #     plt.show()
 
             max_idx = np.squeeze(np.asarray(np.where(ncc == np.max(ncc))))
 
@@ -232,7 +234,7 @@ class Piv:
                                             subpixel_peak, template_size)
 
         # All done. Close progress display figure
-        plt.close(status_figure)
+        # plt.close(status_figure)
 
 
     def deform(self, template_size, step_size, propagate):
@@ -466,7 +468,7 @@ class Piv:
         #     )
         #     before_axis.add_artist(arrow)
 
-        plt.pause(0.1)
+        plt.pause(0.02)
         # if len(self._piv_vectors) == 0:
         #     plt.pause(10)
 
@@ -646,41 +648,41 @@ class Piv:
                 filtered_vectors.append([u_smooth[vt_count, hz_count],
                                          v_smooth[vt_count, hz_count]])
 
-        # Status figure of before and after smoothing
-        status_figure = plt.figure()
-        u_axis = plt.subplot(2, 3, 1)
-        v_axis = plt.subplot(2, 3, 2)
-        u_axis.imshow(u_img)
-        v_axis.imshow(v_img)
-        before_axis = plt.subplot(2, 3, 3)
-        piv_origins = np.asarray(self._piv_origins)
-        piv_vectors = np.asarray(self._piv_vectors)
-        before_axis.quiver(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0], piv_vectors[:,1], angles='xy', scale_units='xy')
-        before_axis.invert_yaxis()
-        before_axis.axis('equal') 
-        u_axis_smooth = plt.subplot(2, 3, 4)
-        v_axis_smooth = plt.subplot(2, 3, 5)
-        u_axis_smooth.imshow(u_smooth)
-        v_axis_smooth.imshow(v_smooth)
-        after_axis = plt.subplot(2, 3, 6)
-        temp_piv_origins = []
-        temp_piv_u = []
-        temp_piv_v = []
-        for vt_count in range(num_vt_comps):
-            for hz_count in range(num_hz_comps):
-                temp_piv_origins.append([hz_count*step_size + template_size,
-                                         vt_count*step_size + template_size])
-                row = vt_count
-                col = hz_count
-                temp_piv_u.append(u_smooth[row, col])
-                temp_piv_v.append(v_smooth[row, col])
-        temp_piv_origins = np.asarray(temp_piv_origins)
-        temp_piv_u = np.asarray(temp_piv_u)
-        temp_piv_v = np.asarray(temp_piv_v)
-        after_axis.quiver(temp_piv_origins[:,0], temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
-        after_axis.invert_yaxis()
-        after_axis.axis('equal') 
-        plt.show()
+        # # Status figure of before and after smoothing
+        # status_figure = plt.figure()
+        # u_axis = plt.subplot(2, 3, 1)
+        # v_axis = plt.subplot(2, 3, 2)
+        # u_axis.imshow(u_img)
+        # v_axis.imshow(v_img)
+        # before_axis = plt.subplot(2, 3, 3)
+        # piv_origins = np.asarray(self._piv_origins)
+        # piv_vectors = np.asarray(self._piv_vectors)
+        # before_axis.quiver(piv_origins[:,0], piv_origins[:,1], piv_vectors[:,0], piv_vectors[:,1], angles='xy', scale_units='xy')
+        # before_axis.invert_yaxis()
+        # before_axis.axis('equal') 
+        # u_axis_smooth = plt.subplot(2, 3, 4)
+        # v_axis_smooth = plt.subplot(2, 3, 5)
+        # u_axis_smooth.imshow(u_smooth)
+        # v_axis_smooth.imshow(v_smooth)
+        # after_axis = plt.subplot(2, 3, 6)
+        # temp_piv_origins = []
+        # temp_piv_u = []
+        # temp_piv_v = []
+        # for vt_count in range(num_vt_comps):
+        #     for hz_count in range(num_hz_comps):
+        #         temp_piv_origins.append([hz_count*step_size + template_size,
+        #                                  vt_count*step_size + template_size])
+        #         row = vt_count
+        #         col = hz_count
+        #         temp_piv_u.append(u_smooth[row, col])
+        #         temp_piv_v.append(v_smooth[row, col])
+        # temp_piv_origins = np.asarray(temp_piv_origins)
+        # temp_piv_u = np.asarray(temp_piv_u)
+        # temp_piv_v = np.asarray(temp_piv_v)
+        # after_axis.quiver(temp_piv_origins[:,0], temp_piv_origins[:,1], temp_piv_u, temp_piv_v, angles='xy', scale_units='xy')
+        # after_axis.invert_yaxis()
+        # after_axis.axis('equal') 
+        # plt.show()
 
         return filtered_origins, filtered_vectors
 
@@ -707,15 +709,15 @@ class Piv:
         self._deformation_field_u_total += self._deformation_field_u
         self._deformation_field_v_total += self._deformation_field_v
 
-        # status figure
-        status_figure = plt.figure()
-        axu = plt.subplot(1,3,1)
-        axu.imshow(self._deformation_field_u)
-        axv = plt.subplot(1,3,2)
-        axv.imshow(self._deformation_field_v)
-        axvt = plt.subplot(1,3,3)
-        axvt.imshow(self._deformation_field_v_total)
-        plt.show()
+        # # status figure
+        # status_figure = plt.figure()
+        # axu = plt.subplot(1,3,1)
+        # axu.imshow(self._deformation_field_u)
+        # axv = plt.subplot(1,3,2)
+        # axv.imshow(self._deformation_field_v)
+        # axvt = plt.subplot(1,3,3)
+        # axvt.imshow(self._deformation_field_v_total)
+        # plt.show()
         # status figure
         # status_figure = plt.figure()
         # computed_axis = plt.subplot(1, 2, 1)
