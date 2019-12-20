@@ -7,8 +7,8 @@ from synthetic_dem_functions import create_dem, export_geotiff
 
 # Set DEM and uncertainty options
 deform_params = {
-    'tx': 0,
-    'ty': 0,
+    'tx': 1.7,
+    'ty': 1.7,
     'sx': 0,
     'sy': 0.0,
     'g_maj': 30,
@@ -18,7 +18,7 @@ deform_params = {
 }
 noise_std = 0.1
 X, Y, Z, N = create_dem(250, 5000, 5, 6, deform=deform_params, noise=noise_std)
-filename = 'base2'
+filename = 'test/transX1p7Y1p7'
 
 # Export DEM and uncertainty array to GeoTIFF
 export_geotiff(X, Y, Z, filename + '.tif')
