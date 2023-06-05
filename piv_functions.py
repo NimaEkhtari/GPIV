@@ -146,8 +146,8 @@ def run_piv(before_height, before_uncertainty,
                 correlation_max_idx[0][0]-1:correlation_max_idx[0][0]+2,
                 correlation_max_idx[1][0]-1:correlation_max_idx[1][0]+2])
             
-            piv_origins.append(((hz_count*step_size + template_size - (1 - template_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
-                                (vt_count*step_size + template_size - (1 - template_size % 2)*0.5)))
+            piv_origins.append(((hz_count*step_size + np.floor(template_size/2) - (1 - template_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
+                                (vt_count*step_size + np.floor(template_size/2) - (1 - template_size % 2)*0.5)))
             piv_vectors.append(((correlation_max_idx[1][0] - math.ceil(template_size/2) + subpixel_peak[0]),
                                 (correlation_max_idx[0][0] - math.ceil(template_size/2) + subpixel_peak[1])))
 
