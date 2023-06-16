@@ -44,7 +44,7 @@ def estimate_uncertainty(points, points_tpu, grids):
         dem_tpu:    (m x 3 x 3) array of TIN triangle vertex coordinates containing each grid cell  
     '''
     
-    inds, tvc = get_triangles(points, grids)                            # PErform Delaunay triangulation
+    inds, tvc = get_triangles(points, grids)                            # Perform Delaunay triangulation
     
     centroid = np.mean(points, axis = 0)                                # Calculate 3D centroid of points
     tv = tvc - centroid                                                 # Remove point centroids (normalize the coordinates to improve calculation stability)

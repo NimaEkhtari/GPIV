@@ -10,7 +10,7 @@ import show_functions
 
 
 def piv(before_height_file, after_height_file,
-        template_size, step_size,
+        template_size, step_size, search_scale,
         before_uncertainty_file, after_uncertainty_file,
         propagate, output_base_name):
 
@@ -20,6 +20,7 @@ def piv(before_height_file, after_height_file,
                                        before_uncertainty_file,
                                        after_height_file,
                                        after_uncertainty_file,
+                                       search_scale, 
                                        propagate)
 
     if not propagate:
@@ -27,7 +28,7 @@ def piv(before_height_file, after_height_file,
         run_piv(before_height, [],
                 after_height, [],
                 geo_transform, template_size, step_size,
-                False, output_base_name)
+                search_scale, False, output_base_name)
         show_functions.show(before_height_file,
                             output_base_name + 'vectors.json',
                             None,
@@ -37,14 +38,14 @@ def piv(before_height_file, after_height_file,
         run_piv(before_height, [],
                 before_height, [],
                 geo_transform, template_size, step_size,
-                False, output_base_name)
+                search_scale, False, output_base_name)
         xy_bias_variance = get_bias_variance(output_base_name)
 
         print("Computing PIV and propagating uncertainty.")
         run_piv(before_height, before_uncertainty,
                 after_height, after_uncertainty,
                 geo_transform, template_size, step_size,
-                True, output_base_name)
+                search_scale, True, output_base_name)
 
         print("Adding bias variance to propagated PIV uncertainty.")
         add_bias_variance(output_base_name, xy_bias_variance)
@@ -60,6 +61,7 @@ def get_image_arrays(
     before_uncertainty_file,
     after_height_file,
     after_uncertainty_file,
+    search_scale,
     propagate):    
 
     before_height_source = rasterio.open(before_height_file)
@@ -87,7 +89,7 @@ def get_image_arrays(
 def run_piv(before_height, before_uncertainty,
             after_height, after_uncertainty,
             geo_transform, template_size,
-            step_size, propagate, output_base_name):
+            step_size, search_scale, propagate, output_base_name):
     
     piv_origins = []
     piv_vectors = []
@@ -99,23 +101,24 @@ def run_piv(before_height, before_uncertainty,
     before_axis = plt.subplot(1, 2, 1)
     after_axis = plt.subplot(1, 2, 2)
 
-    search_size = template_size * 2 # size of area to be searched for match in 'after' image
+    search_size = template_size * search_scale # size of area to be searched for match in 'after' image
     number_horizontal_computations = math.floor((before_height.shape[1]-search_size) / step_size)
     number_vertical_computations = math.floor((before_height.shape[0]-search_size) / step_size)
 
     for vt_count in range(number_vertical_computations):
         for hz_count in range(number_horizontal_computations):
-
-            hz_template_start = int(hz_count*step_size + math.ceil(template_size/2))
-            hz_template_end = int(hz_count*step_size + math.ceil(template_size/2) + template_size)
-            vt_template_start = int(vt_count*step_size + math.ceil(template_size/2))
-            vt_template_end = int(vt_count*step_size + math.ceil(template_size/2) + template_size)
-            height_template = before_height[vt_template_start:vt_template_end, hz_template_start:hz_template_end].copy()
+            
+            offset = math.floor(((search_scale - 1) / 2) * template_size)
+            hz_template_start = int(hz_count*step_size + offset)
+            hz_template_end   = int(hz_count*step_size + offset + template_size)
+            vt_template_start = int(vt_count*step_size + offset)
+            vt_template_end   = int(vt_count*step_size + offset + template_size)
+            height_template   = before_height[vt_template_start:vt_template_end, hz_template_start:hz_template_end].copy()
             
             hz_search_start = int(hz_count*step_size)
-            hz_search_end = int(hz_count*step_size + search_size + (template_size % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
+            hz_search_end = int(hz_count*step_size + search_size + (search_size % 2)) # the modulo addition forces the search area to be symmetric around odd-sized templates
             vt_search_start = int(vt_count*step_size)
-            vt_search_end = int(vt_count*step_size + search_size + (template_size % 2)) 
+            vt_search_end = int(vt_count*step_size + search_size + (search_size % 2)) 
             height_search = after_height[vt_search_start:vt_search_end, hz_search_start:hz_search_end].copy()            
 
             show_piv_location(before_height, after_height,
@@ -146,8 +149,8 @@ def run_piv(before_height, before_uncertainty,
                 correlation_max_idx[0][0]-1:correlation_max_idx[0][0]+2,
                 correlation_max_idx[1][0]-1:correlation_max_idx[1][0]+2])
             
-            piv_origins.append(((hz_count*step_size + np.floor(template_size/2) - (1 - template_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
-                                (vt_count*step_size + np.floor(template_size/2) - (1 - template_size % 2)*0.5)))
+            piv_origins.append(((hz_count*step_size + np.floor(search_size/2) - (1 - search_size % 2)*0.5), # modulo operator adjusts even-sized template origins to be between pixel centers
+                                (vt_count*step_size + np.floor(search_size/2) - (1 - search_size % 2)*0.5)))
             piv_vectors.append(((correlation_max_idx[1][0] - math.ceil(template_size/2) + subpixel_peak[0]),
                                 (correlation_max_idx[0][0] - math.ceil(template_size/2) + subpixel_peak[1])))
 
