@@ -1,3 +1,13 @@
+# Uncertainty propagation through Raster Correlation  using GPIV
+This is an update to the original repository by Preston Hartzell accessible at [this repo](https://github.com/pjhartzell/GPIV).
+
+The main updates made to the original repo are as follows;
+1- The inputs do not have to be in GeoTiff format. The inputs are now point clouds that have full covariance matrices.
+2- User needs to modify input parameters as well as window aize and step size in run_test_v1.py
+3- The uncertainty of each raster grid is calculated by propagating the total uncertainty of points forming the TIN triangle that contains the grid cell.
+
+You can read the original readMe below:
+
 # GPIV - Geospatial Particle Imaging Velocimetry
 
 ## Description
